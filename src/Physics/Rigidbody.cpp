@@ -1,20 +1,19 @@
 #include "Rigidbody.h"
 
-Rigidbody::Rigidbody(float mass, float friction, float damping)
-	: mass(mass), friction(friction), damping(damping), velocity(sf::Vector2f(0.f, 0.f)), position(sf::Vector2f(0.f, 0.f)) {
+Rigidbody::Rigidbody(float mass, float friction, float damping, float radius, float restitution)
+	: mass(mass), friction(friction), damping(damping), radius(radius), restitution(restitution),
+	velocity(sf::Vector2f(0.f, 0.f)){
 }
 
 void Rigidbody::Step(float deltaTime) {
-	ApplyGravity(sf::Vector2f(0.0f, 9.81f), deltaTime);
-	// ApplyDamping(deltaTime);
-	StepPosition(deltaTime);
+	ApplyDamping();
 }
 
 void Rigidbody::ApplyForce(float force, sf::Vector2f direction) {
 	sf::Vector2f acc = (force / mass) * direction;
 	this->velocity += acc;
 }
-void Rigidbody::ApplyDamping(float deltaTime) {
+void Rigidbody::ApplyDamping() {
 	this->velocity *= this->damping;
 }
 void Rigidbody::ApplyGravity(sf::Vector2f gravity, float deltaTime) {
