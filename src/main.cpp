@@ -4,18 +4,19 @@
 
 int main()
 {
+    const float PPU = 100.0f; // 1 Meter = 100 Pixels
     sf::Clock clock;
     // Create the main window
     sf::RenderWindow window(sf::VideoMode({ 800, 600 }), "SFML window");
 
     // Create a circle shape to represent the rigidbody
-	sf::CircleShape shape(30.f);
+	sf::CircleShape shape(0.5f * PPU);
 	shape.setFillColor(sf::Color::Green);
-    shape.setOrigin(sf::Vector2f(30.f, 30.f));
+    shape.setOrigin(sf::Vector2f(0.5f, 0.5f) * PPU);
 
     // Create a rigidbody
 	Rigidbody body(1.0f, 0.5f, 0.98f);
-    body.position = sf::Vector2f(400.f, 100.f);
+    body.position = sf::Vector2f(4.f, 1.f);
 
     // Create a physics world
 	PhysicsWorld physicsWorld;
@@ -50,7 +51,7 @@ int main()
 		}
 
 		// Update the shape's position based on the rigidbody's position
-		shape.setPosition(body.position);
+		shape.setPosition(body.position * PPU);
         
         window.clear();
 		window.draw(shape);
