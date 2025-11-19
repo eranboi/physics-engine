@@ -1,4 +1,5 @@
 #include "PhysicsWorld.h"
+#include <cmath>
 
 // Temporary floor positions
 const float FLOOR_Y = 6.0f;
@@ -25,6 +26,55 @@ void PhysicsWorld::Step(float deltaTime) {
 		else if (body->position.x - body->radius < FLOOR_X_MIN) {
 			body->position.x = FLOOR_X_MIN + body->radius;
 			body->velocity.x *= -body->restitution;
+		}
+
+		for (int i = 0; i < bodies.size(); i++)
+		{
+			for (int j = i + 1; j < bodies.size(); j++)
+			{
+				Rigidbody* bodyA = bodies[i];
+				Rigidbody* bodyB = bodies[j];
+				
+				sf::Vector2f collisionNormal = bodyB->position - bodyA->position;
+
+				// Find the distance between bodies using Euclidean Distance 
+				// sqrt( (x2 - x1)^2 + (y2 - y1)^2 )
+				float distance = std::sqrt(collisionNormal.x * collisionNormal.x + collisionNormal.y * collisionNormal.y);
+				float totalRadius = bodyA->radius + bodyB->radius;
+
+				// If the distance is smaller than the total radius, they're colliding.
+				// If they're colliding, find the MTV and move the bodies accordingly.
+				if (distance < totalRadius) {
+					float penetrationDepth = totalRadius - distance;
+					sf::Vector2f collisionNormalNormalized = collisionNormal / distance;
+
+					// Position correction 
+					bodyA->position -= collisionNormalNormalized * (penetrationDepth * 0.5f);
+					bodyB->position += collisionNormalNormalized * (penetrationDepth * 0.5f);
+
+					// Find the relvative velocity
+					sf::Vector2f relativeVelocity = bodyB->velocity - bodyA->velocity;
+
+					// Find the velocity along the normal of the collision, using dot product.
+					float velocityAlongNormal = relativeVelocity.x * collisionNormalNormalized.x + relativeVelocity.y * collisionNormalNormalized.y;
+
+					// Get the minimum restitution of the two bodies
+					float e = std::min(bodyA->restitution, bodyB->restitution);
+
+					// Calculate impulse scalar
+					float j = (-(1.0f + e) * velocityAlongNormal) / (bodyA->invMass + bodyB->invMass);
+
+					// Calculate the impulse
+					sf::Vector2f impulse = j * collisionNormal;
+
+					
+					bodyA->velocity -= impulse;
+					bodyB->velocity += impulse;
+
+				}
+
+
+			}
 		}
 
 		

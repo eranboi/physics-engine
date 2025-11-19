@@ -5,6 +5,7 @@ class Rigidbody {
 public:
 	Rigidbody(float mass, float friction, float damping, float radius, float restitution);
 	float mass;
+	float invMass;
 	float friction;
 	float damping;
 	float radius;

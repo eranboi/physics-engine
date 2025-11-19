@@ -25,7 +25,7 @@ FetchContent_MakeAvailable(sfml)
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 # --- Executable Oluştur ---
-add_executable(${PROJECT_NAME} ${SOURCES} "src/Physics/Rigidbody.cpp" "src/Physics/PhysicsWorld.cpp")
+add_executable(${PROJECT_NAME} ${SOURCES} "src/Physics/Rigidbody.cpp" "src/Physics/PhysicsWorld.cpp" "src/Application.h" "src/Application.cpp")
 
 # --- Include Dizinleri ---
 # src klasörünü include path'e ekle (headerları rahat bulmak için)

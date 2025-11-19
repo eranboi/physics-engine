@@ -1,7 +1,7 @@
 #include "Rigidbody.h"
 
 Rigidbody::Rigidbody(float mass, float friction, float damping, float radius, float restitution)
-	: mass(mass), friction(friction), damping(damping), radius(radius), restitution(restitution),
+	: mass(mass), invMass(1/mass), friction(friction), damping(damping), radius(radius), restitution(restitution),
 	velocity(sf::Vector2f(0.f, 0.f)){
 }
 
