@@ -1,0 +1,42 @@
+# --- Build Çýktýlarý (En Önemlisi) ---
+build/
+out/
+bin/
+lib/
+cmake-build-debug/
+cmake-build-release/
+
+# --- CMake Dosyalarý ---
+CMakeCache.txt
+CMakeFiles/
+*.cmake
+!CMakeLists.txt
+cmake_install.cmake
+
+# --- Visual Studio (IDE) Dosyalarý ---
+.vs/
+*.user
+*.suo
+*.ipch
+*.sdf
+*.opensdf
+*.pdb
+*.ilk
+*.aps
+
+# --- VS Code ---
+.vscode/
+
+# --- Derlenmiþ Nesneler ve Exe'ler ---
+*.obj
+*.o
+*.exe
+*.dll
+*.lib
+*.a
+*.so
+*.dylib
+
+# --- Ýþletim Sistemi ---
+Thumbs.db
+.DS_Store
