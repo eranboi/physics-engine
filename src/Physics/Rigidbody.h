@@ -1,5 +1,6 @@
 #pragma once
 #include <SFML/System/Vector2.hpp>
+#include <SFML/Graphics/Color.hpp>
 
 class Rigidbody {
 public:
@@ -10,6 +11,7 @@ public:
 	float damping;
 	float radius;
 	float restitution;
+	sf::Color color;
 
 	sf::Vector2f velocity;
 	sf::Vector2f position;

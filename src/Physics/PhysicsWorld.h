@@ -19,5 +19,8 @@ public:
 private:
 	std::vector<Rigidbody*> bodies;
 	sf::Vector2f gravity;
+	void ResolveCollisions();
+	void BoundaryCheck(float deltaTime);
+
 
 };
