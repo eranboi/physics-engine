@@ -35,13 +35,18 @@ void PhysicsWorld::ResolveCollisions() {
 			sf::Vector2f collisionNormal = bodyB->position - bodyA->position;
 
 			// Find the distance between bodies using Euclidean Distance 
-			// sqrt( (x2 - x1)^2 + (y2 - y1)^2 )
-			float distance = std::sqrt(collisionNormal.x * collisionNormal.x + collisionNormal.y * collisionNormal.y);
+			// Optimization: use distance squared to avoid sqrt until necessary
+			float distanceSq = collisionNormal.x * collisionNormal.x + collisionNormal.y * collisionNormal.y;
 			float totalRadius = bodyA->radius + bodyB->radius;
+			float totalRadiusSq = totalRadius * totalRadius;
 
 			// If the distance is smaller than the total radius, they're colliding.
 			// If they're colliding, find the MTV and move the bodies accordingly.
-			if (distance < totalRadius) {
+			if (distanceSq < totalRadiusSq) {
+
+				// Calculate actual distance
+				float distance = std::sqrt(distanceSq);
+
 				float penetrationDepth = totalRadius - distance;
 				sf::Vector2f collisionNormalNormalized = collisionNormal / distance;
 
