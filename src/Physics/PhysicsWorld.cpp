@@ -1,7 +1,9 @@
 #include "PhysicsWorld.h"
 #include <cmath>
+#include "./Collision/BroadPhase/Grid.h"
+#include <SFML/System/Vector2.hpp>
 
-// Temporary floor positions
+// Temporary floor positions based on window size
 const float FLOOR_Y = 9.0f;
 const float FLOOR_X_MAX = 16.0f;
 const float FLOOR_X_MIN = 0.0f;
@@ -20,58 +22,81 @@ void PhysicsWorld::Step(float deltaTime) {
 		ResolveCollisions();
 		BoundaryCheck(deltaTime);
 	}
-
-	
 }
 
 void PhysicsWorld::ResolveCollisions() {
-	for (int i = 0; i < bodies.size(); i++)
+	
+	// Reset the grid
+	grid.Clear();
+
+	// Fill the grid with bodies
+	for (Rigidbody* body : bodies) {
+		grid.AddBody(body);
+	}
+
+	for(Rigidbody* bodyA : bodies)
 	{
-		for (int j = i + 1; j < bodies.size(); j++)
-		{
-			Rigidbody* bodyA = bodies[i];
-			Rigidbody* bodyB = bodies[j];
+		// Get the cell of the body A
+		int cellX = static_cast<int>(bodyA->position.x / grid.GetCellSize());
+		int cellY = static_cast<int>(bodyA->position.y / grid.GetCellSize());
 
-			sf::Vector2f collisionNormal = bodyB->position - bodyA->position;
+		// Iterate on the neighbor cells
+		for (int x = -1; x <= 1; x++) {
+			for (int y = -1; y <= 1; y++) {
 
-			// Find the distance between bodies using Euclidean Distance 
-			// Optimization: use distance squared to avoid sqrt until necessary
-			float distanceSq = collisionNormal.x * collisionNormal.x + collisionNormal.y * collisionNormal.y;
-			float totalRadius = bodyA->radius + bodyB->radius;
-			float totalRadiusSq = totalRadius * totalRadius;
+				// Get the bodies of the neighbor cell
+				const auto& neighbors = grid.GetCellContent(cellX + x, cellY + y);
 
-			// If the distance is smaller than the total radius, they're colliding.
-			// If they're colliding, find the MTV and move the bodies accordingly.
-			if (distanceSq < totalRadiusSq) {
+				for (Rigidbody* bodyB : neighbors) {
 
-				// Calculate actual distance
-				float distance = std::sqrt(distanceSq);
+					// Skip self
+					if (bodyA == bodyB) continue;
 
-				float penetrationDepth = totalRadius - distance;
-				sf::Vector2f collisionNormalNormalized = collisionNormal / distance;
+					// Duplicate check, if A-B is resolved skip B-A
+					if (bodyA > bodyB) continue;
 
-				// Position correction 
-				bodyA->position -= collisionNormalNormalized * (penetrationDepth * 0.5f);
-				bodyB->position += collisionNormalNormalized * (penetrationDepth * 0.5f);
+					sf::Vector2f collisionNormal = bodyB->position - bodyA->position;
 
-				// Find the relvative velocity
-				sf::Vector2f relativeVelocity = bodyB->velocity - bodyA->velocity;
+					// Find the distance between bodies using Euclidean Distance 
+					// Optimization: use distance squared to avoid sqrt until necessary
+					float distanceSq = collisionNormal.x * collisionNormal.x + collisionNormal.y * collisionNormal.y;
+					float totalRadius = bodyA->radius + bodyB->radius;
+					float totalRadiusSq = totalRadius * totalRadius;
 
-				// Find the velocity along the normal of the collision, using dot product.
-				float velocityAlongNormal = relativeVelocity.x * collisionNormalNormalized.x + relativeVelocity.y * collisionNormalNormalized.y;
+					// If the distance is smaller than the total radius, they're colliding.
+					// If they're colliding, find the MTV and move the bodies accordingly.
+					if (distanceSq < totalRadiusSq) {
 
-				// Get the minimum restitution of the two bodies
-				float e = std::min(bodyA->restitution, bodyB->restitution);
+						// Calculate actual distance
+						float distance = std::sqrt(distanceSq);
 
-				// Calculate impulse scalar
-				float j = (-(1.0f + e) * velocityAlongNormal) / (bodyA->invMass + bodyB->invMass);
+						float penetrationDepth = totalRadius - distance;
+						sf::Vector2f collisionNormalNormalized = collisionNormal / distance;
 
-				// Calculate the impulse
-				sf::Vector2f impulse = j * collisionNormalNormalized;
+						// Position correction 
+						bodyA->position -= collisionNormalNormalized * (penetrationDepth * 0.5f);
+						bodyB->position += collisionNormalNormalized * (penetrationDepth * 0.5f);
+
+						// Find the relvative velocity
+						sf::Vector2f relativeVelocity = bodyB->velocity - bodyA->velocity;
+
+						// Find the velocity along the normal of the collision, using dot product.
+						float velocityAlongNormal = relativeVelocity.x * collisionNormalNormalized.x + relativeVelocity.y * collisionNormalNormalized.y;
+
+						// Get the minimum restitution of the two bodies
+						float e = std::min(bodyA->restitution, bodyB->restitution);
+
+						// Calculate impulse scalar
+						float j = (-(1.0f + e) * velocityAlongNormal) / (bodyA->invMass + bodyB->invMass);
+
+						// Calculate the impulse
+						sf::Vector2f impulse = j * collisionNormalNormalized;
 
 
-				bodyA->velocity -= impulse * bodyA->invMass;
-				bodyB->velocity += impulse * bodyB->invMass;
+						bodyA->velocity -= impulse * bodyA->invMass;
+						bodyB->velocity += impulse * bodyB->invMass;
+					}
+				}
 			}
 		}
 	}

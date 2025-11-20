@@ -1,9 +1,11 @@
 #include "Application.h"
 #include <iostream>
 #include <string>
+#include <cstdint>
 
 Application::Application()
     : window(sf::VideoMode({ 1600, 900 }), "Physics Engine"),
+    physicsWorld(16, 9),
     frameCount(0),
     physicsTime(0.0f),
     debugText(font)
@@ -45,7 +47,6 @@ void Application::InitScene() {
     float ballRadius = 0.1f;
     float spacing = .25f;
 
-
     int columns = static_cast<int>(sqrt(ballCount * 1.77f));
 
     float totalGroupWidth = columns * spacing;
@@ -59,11 +60,16 @@ void Application::InitScene() {
         int col = i % columns;
         int row = i / columns;
 
-		// Random restitution between 0.9 and 1.0
-        float randomRestitution = 0.9f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 0.1f));
+		// Random restitution between 0.2 and 1.0
+        float randomRestitution = 0.2f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 0.8f));
+
+        // Random mass between 1.0 and 26.0
+        float minMass = 1.0f;
+        float maxRange = 25.0f;
+        float randomMass = minMass + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / maxRange));
 
 		// Create Rigidbody
-        Rigidbody* body = new Rigidbody(1.0f, 0.5f, 0.999f, ballRadius, randomRestitution);
+        Rigidbody* body = new Rigidbody(randomMass, 0.5f, 0.99f, ballRadius, randomRestitution);
 
 		// Add slight random jitter to positions to avoid perfect grid alignment
         float jitter = (static_cast<float>(rand()) / RAND_MAX) * 0.02f;
@@ -74,12 +80,17 @@ void Application::InitScene() {
         body->position = sf::Vector2f(xPos, yPos);
 
 		// Random initial velocity
-        float randVelX = -2.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 4.0f));
-        float randVelY = -2.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 4.0f));
+        float randVelX = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
+        float randVelY = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
         body->velocity = sf::Vector2f(randVelX, randVelY);
 
-		// Random color based on index
-        body->color = sf::Color(255, 100 + (i % 155), 100); 
+        float t = (randomMass - minMass) / maxRange;
+
+        std::uint8_t r = static_cast<std::uint8_t>(t * 255);
+        std::uint8_t g = static_cast<std::uint8_t>((1.0f - t) * 255);
+        std::uint8_t b = 0;
+		// Random color based on mass (heavy -> red, light -> green)
+        body->color = sf::Color(r, g, b);
 
         physicsWorld.AddBody(body);
         bodies.push_back(body);
