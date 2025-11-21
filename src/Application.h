@@ -23,7 +23,8 @@ private:
     PhysicsWorld physicsWorld;
     std::vector<Rigidbody*> bodies;
 
-    sf::CircleShape baseShape;
+    sf::CircleShape ballShape;
+    sf::ConvexShape polygonShape;
 
     sf::Font font;
     sf::Text debugText;

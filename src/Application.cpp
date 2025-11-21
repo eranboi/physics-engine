@@ -20,11 +20,6 @@ Application::Application()
     debugText.setFillColor(sf::Color::White);
     debugText.setPosition({ 10.f, 10.f });
 
-    // Configure the shared base shape for rendering
-    baseShape.setRadius(0.1f * PPU);
-    baseShape.setOrigin(sf::Vector2f(0.1f * PPU, 0.1f * PPU));
-    baseShape.setFillColor(sf::Color::Green);
-
     // Initialize the game scene
     InitScene();
 }
@@ -38,62 +33,101 @@ Application::~Application() {
 }
 
 void Application::InitScene() {
-    int ballCount = 1250;
+    int bodyCount = 50;
 
 	// Changes with window size
     float worldWidth = 16.0f;
     float worldHeight = 9.0f;
 
-    float ballRadius = 0.1f;
+    float wallThickness = 1.0f;
+    float halfThick = wallThickness / 2.0f;
+
+    // Floor 
+    Rigidbody* floor = Rigidbody::CreateBox(worldWidth, wallThickness, 0.0f, 0.5f);
+    floor->position = sf::Vector2f(worldWidth / 2.0f, worldHeight - halfThick);
+    floor->color = sf::Color(50, 50, 50);
+    physicsWorld.AddBody(floor);
+    bodies.push_back(floor);
+
+    // Ceiling
+    Rigidbody* ceiling = Rigidbody::CreateBox(worldWidth, wallThickness, 0.0f, 0.5f);
+    ceiling->position = sf::Vector2f(worldWidth / 2.0f, halfThick);
+    ceiling->color = sf::Color(50, 50, 50);
+    physicsWorld.AddBody(ceiling);
+    bodies.push_back(ceiling);
+
+    // Left Wall
+    Rigidbody* leftWall = Rigidbody::CreateBox(wallThickness, worldHeight - (wallThickness * 2), 0.0f, 0.5f);
+    leftWall->position = sf::Vector2f(halfThick, worldHeight / 2.0f);
+    leftWall->color = sf::Color(50, 50, 50);
+    physicsWorld.AddBody(leftWall);
+    bodies.push_back(leftWall);
+
+    // Right Wall
+    Rigidbody* rightWall = Rigidbody::CreateBox(wallThickness, worldHeight - (wallThickness * 2), 0.0f, 0.5f);
+    rightWall->position = sf::Vector2f(worldWidth - halfThick, worldHeight / 2.0f);
+    rightWall->color = sf::Color(50, 50, 50);
+    physicsWorld.AddBody(rightWall);
+    bodies.push_back(rightWall);
+
+
+    float shapeSize = 0.3f;
     float spacing = .25f;
 
-    int columns = static_cast<int>(sqrt(ballCount * 1.77f));
+    int columns = static_cast<int>(sqrt(bodyCount * 1.77f));
 
     float totalGroupWidth = columns * spacing;
-    float rows = std::ceil((float)ballCount / columns);
+    float rows = std::ceil((float)bodyCount / columns);
     float totalGroupHeight = rows * spacing;
 
     float startX = (worldWidth - totalGroupWidth) / 2.0f;
     float startY = (worldHeight - totalGroupHeight) / 2.0f;
 
-    for (int i = 0; i < ballCount; i++) {
+    for (int i = 0; i < bodyCount; i++) {
         int col = i % columns;
         int row = i / columns;
 
-		// Random restitution between 0.2 and 1.0
-        float randomRestitution = 0.2f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 0.8f));
-
-        // Random mass between 1.0 and 26.0
-        float minMass = 1.0f;
-        float maxRange = 25.0f;
-        float randomMass = minMass + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / maxRange));
-
-		// Create Rigidbody
-        Rigidbody* body = new Rigidbody(randomMass, 0.5f, 0.99f, ballRadius, randomRestitution);
-
-		// Add slight random jitter to positions to avoid perfect grid alignment
         float jitter = (static_cast<float>(rand()) / RAND_MAX) * 0.02f;
-
         float xPos = startX + (col * spacing) + jitter;
         float yPos = startY + (row * spacing);
 
-        body->position = sf::Vector2f(xPos, yPos);
+        float randomRestitution = 0.2f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 0.7f));
 
-		// Random initial velocity
-        float randVelX = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
-        float randVelY = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
-        body->velocity = sf::Vector2f(randVelX, randVelY);
+        Rigidbody* body = nullptr;
 
-        float t = (randomMass - minMass) / maxRange;
+        // Random object creation
+        if (rand() % 2 == 0) {
+            body = Rigidbody::CreateBox(shapeSize, shapeSize, 1.0f, randomRestitution);
+        }
+        else {
+            // Get local points for the triangle
+            // Create triangle finds the center and fixes the positional issues of the vertices
+            // After that we'll move the bodies to their appropriate positions.
 
-        std::uint8_t r = static_cast<std::uint8_t>(t * 255);
-        std::uint8_t g = static_cast<std::uint8_t>((1.0f - t) * 255);
-        std::uint8_t b = 0;
-		// Random color based on mass (heavy -> red, light -> green)
-        body->color = sf::Color(r, g, b);
+            float s = shapeSize;
+            
+            sf::Vector2f p1(0.0f, -s / 2);
+            sf::Vector2f p2(s, s);
+            sf::Vector2f p3(-s, s);
 
-        physicsWorld.AddBody(body);
-        bodies.push_back(body);
+            body = Rigidbody::CreateTriangle(p1, p2, p3, 1.0f, randomRestitution);
+        }
+
+        // Move to body to the position and give it initial values.
+        if (body != nullptr) {
+            body->position = sf::Vector2f(xPos, yPos);
+
+            // Random velocity
+            float randVelX = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
+            float randVelY = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
+            body->velocity = sf::Vector2f(randVelX, randVelY);
+
+            body->color = sf::Color(224, 187, 228);
+          
+            // Add to the simulation
+            physicsWorld.AddBody(body);
+            bodies.push_back(body);
+        }
     }
 }
 
@@ -142,11 +176,28 @@ void Application::Update(float dt) {
 void Application::Render() {
     window.clear();
 
-    // Render all bodies using the shared shape
+    // Render all bodies using the shared shape (Idk if that's helping with the performance or not)
     for (Rigidbody* body : bodies) {
-        baseShape.setPosition(body->position * PPU);
-		baseShape.setFillColor(body->color);
-        window.draw(baseShape);
+        if(body-> shapeType == ShapeType::Circle)
+        {
+            ballShape.setRadius(body->radius * PPU);
+            ballShape.setOrigin(sf::Vector2f(body->radius * PPU, body->radius * PPU));
+            ballShape.setPosition(body->position * PPU);
+            ballShape.setFillColor(body->color);
+            window.draw(ballShape);
+        }
+        else {
+
+            std::vector<sf::Vector2f> vertices = body->GetTransformedVertices();
+
+            polygonShape.setPointCount(vertices.size());
+            for (size_t i = 0; i < vertices.size(); i++) {
+                polygonShape.setPoint(i, vertices[i] * PPU);
+            }
+
+            polygonShape.setFillColor(body->color);
+            window.draw(polygonShape);
+        }
     }
 
     // Calculate and display FPS and Physics stats

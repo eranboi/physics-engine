@@ -20,9 +20,15 @@ public:
 
 private:
 	std::vector<Rigidbody*> bodies;
+	std::vector<Rigidbody*> staticBodies;
 	sf::Vector2f gravity;
 	void ResolveCollisions();
 	void BoundaryCheck(float deltaTime);
+	void CheckForCollision(Rigidbody& bodyA, Rigidbody& bodyB);
+	void CheckForCircleCircleCollision(Rigidbody* bodyA, Rigidbody* bodyB);
+	void ResolveCollision(Rigidbody& bodyA, Rigidbody& bodyB, float mtv, sf::Vector2f collisionNormal);
+	std::vector<sf::Vector2f> GetAxes(const std::vector<sf::Vector2f>& vertices);
+
 	Grid grid;
 
 
