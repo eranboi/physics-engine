@@ -232,11 +232,6 @@ void PhysicsWorld::ResolveCollision(Rigidbody& bodyA, Rigidbody& bodyB, float mt
 	// Get the minimum restitution of the two bodies
 	float e = std::min(bodyA.restitution, bodyB.restitution);
 
-
-	if (velocityAlongNormal > -520.0f) {
-		e = 0.0f;
-	}
-
 	// Calculate impulse scalar
 	float j = (-(1.0f + e) * velocityAlongNormal) / (bodyA.invMass + bodyB.invMass);
 
