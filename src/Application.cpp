@@ -1,7 +1,6 @@
 #include "Application.h"
 #include <iostream>
-#include <string>
-#include <cstdint>
+#include <sstream>
 
 Application::Application()
     : window(sf::VideoMode({ 1600, 900 }), "Physics Engine"),
@@ -72,7 +71,7 @@ void Application::InitScene() {
 
 
     float shapeSize = 0.3f;
-    float spacing = .25f;
+    float spacing = 1.f;
 
     int columns = static_cast<int>(sqrt(bodyCount * 1.77f));
 
@@ -94,7 +93,7 @@ void Application::InitScene() {
         float randomRestitution = 0.2f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 0.7f));
 
         Rigidbody* body = nullptr;
-
+        
         // Random object creation
         if (rand() % 2 == 0) {
             body = Rigidbody::CreateBox(shapeSize, shapeSize, 1.0f, randomRestitution);
@@ -167,10 +166,48 @@ void Application::ProcessEvents() {
         if (event->is<sf::Event::Closed>())
             window.close();
     }
+
+    bool spaceDown = sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Space);
+    if (spaceDown && !prevSpaceDown) {
+        paused = !paused;
+    }
+    prevSpaceDown = spaceDown;
+
+    bool rightDown = sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Right);
+    if (rightDown && !prevRightDown) {
+        stepForward = true;
+    }
+    prevRightDown = rightDown;
+
+    bool leftDown = sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Left);
+    if (leftDown && !prevLeftDown) {
+        stepBackward = true;
+    }
+    prevLeftDown = leftDown;
 }
 
 void Application::Update(float dt) {
+    if (paused) {
+        // Bir step ileri
+        if (stepForward) {
+            physicsWorld.Step(dt);
+            SaveState();
+            stepForward = false;
+        }
+        // Bir step geri
+        else if (stepBackward) {
+            if (historyIndex > 0) {
+                historyIndex--;
+                LoadState(historyIndex);
+            }
+            stepBackward = false;
+        }
+
+        // Pause modundayken normal akýþý çalýþtýrma
+        return;
+    }
     physicsWorld.Step(dt);
+    SaveState();
 }
 
 void Application::Render() {
@@ -203,9 +240,18 @@ void Application::Render() {
     // Calculate and display FPS and Physics stats
     frameCount++;
     if (fpsClock.getElapsedTime().asSeconds() >= 1.0f) {
-        info = "FPS: " + std::to_string(frameCount) + "\n" +
-            "Entities: " + std::to_string(bodies.size()) + "\n" +
-            "Physics: " + std::to_string(physicsTime) + " s";
+        std::ostringstream ss;
+
+        ss << "Debug Info\n"
+            << "FPS:           " << frameCount << "\n"
+            << "Entities:      " << bodies.size() << "\n"
+            << "Physics Time:  " << physicsTime << " s\n"
+            << "Game State:    " << (paused ? "Paused" : "Running") << "\n"
+            << "History Size:  " << history.size() << "\n"
+            << "Current Step:  " << (historyIndex + 1) << "\n";
+
+        info = ss.str();
+
 
         debugText.setString(info);
         frameCount = 0;
@@ -215,3 +261,38 @@ void Application::Render() {
     window.draw(debugText);
     window.display();
 }
+
+void Application::LoadState(int index)
+{
+    if (index < 0 || index >= history.size()) return;
+
+    auto& s = history[index];
+    for (int i = 0; i < bodies.size(); i++) {
+        bodies[i]->position = s.positions[i];
+        bodies[i]->velocity = s.velocities[i];
+        bodies[i]->angularVelocity = s.angularVelocities[i];
+    }
+}
+
+void Application::SaveState()
+{
+    SimulationState s;
+    s.positions.reserve(bodies.size());
+    s.velocities.reserve(bodies.size());
+    s.angularVelocities.reserve(bodies.size());
+
+    for (auto* b : bodies) {
+        s.positions.push_back(b->position);
+        s.velocities.push_back(b->velocity);
+        s.angularVelocities.push_back(b->angularVelocity);
+    }
+
+    // geçmiþte ileri gitmiþsek ve tekrar oynuyorsak
+    if (historyIndex < (int)history.size() - 1) {
+        history.erase(history.begin() + historyIndex + 1, history.end());
+    }
+
+    history.push_back(s);
+    historyIndex = history.size() - 1;
+}
+
