@@ -24,7 +24,7 @@ private:
     void Update(float dt);
     void Render();
     void InitScene();
-    void LoadState(int index);
+    void LoadState(int index) const;
     void SaveState();
 
     bool prevSpaceDown = false;

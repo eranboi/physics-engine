@@ -1,7 +1,7 @@
 #include "Grid.h"
 #include <cmath>
 
-Grid::Grid(float width, float height, float cellSize)
+Grid::Grid(const float width, const float height, const float cellSize)
 	: width(width), height(height), cellSize(cellSize) {
 
 	// Calculate the cols and rows amount
@@ -38,7 +38,7 @@ void Grid::AddBody(Rigidbody* body) {
 	cells[index].push_back(body);
 }
 
-const std::vector<Rigidbody*>& Grid::GetCellContent(int x, int y) const {
+const std::vector<Rigidbody*>& Grid::GetCellContent(const int x, const int y) const {
 	if (x < 0 || x >= cols || y < 0 || y >= rows) {
 		static std::vector<Rigidbody*> empty;
 		return empty;

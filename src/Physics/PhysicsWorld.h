@@ -26,7 +26,7 @@ struct CollisionManifold {
 
 class PhysicsWorld {
 public:
-	PhysicsWorld(int worldWidth, int worldHeight) : grid(worldWidth, worldHeight, 0.25f) 
+	PhysicsWorld(const int worldWidth, const int worldHeight) : grid(worldWidth, worldHeight, 0.25f) 
 	{
 		gravity = sf::Vector2f(0.0f, 9.81f);
 	}
@@ -39,13 +39,17 @@ private:
 	std::vector<Rigidbody*> bodies;
 	std::vector<Rigidbody*> staticBodies;
 	sf::Vector2f gravity;
-	void ResolveCollisions();
-	void CheckForCollision(Rigidbody& bodyA, Rigidbody& bodyB);
-	void CheckForCircleCircleCollision(Rigidbody* bodyA, Rigidbody* bodyB);
-	void ResolveCollision(CollisionManifold &manifold);
-	std::vector<sf::Vector2f> GetAxes(const std::vector<sf::Vector2f>& vertices);
+	void ResolveCollisions() const;
 
-	std::vector<sf::Vector2f> Clip(const std::vector<sf::Vector2f>& incFace, const sf::Vector2f& normal, float offset);
+	static void CheckForCollision(Rigidbody& bodyA, Rigidbody& bodyB);
+
+	static void CheckForCircleCircleCollision(const Rigidbody* bodyA, const Rigidbody* bodyB);
+
+	static void ResolveCollision(const CollisionManifold &manifold);
+
+	static std::vector<sf::Vector2f> GetAxes(const std::vector<sf::Vector2f>& vertices);
+
+	static std::vector<sf::Vector2f> Clip(const std::vector<sf::Vector2f>& incFace, const sf::Vector2f& normal, float offset);
 
 	Grid grid;
 

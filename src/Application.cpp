@@ -5,9 +5,9 @@
 Application::Application()
     : window(sf::VideoMode({ 1600, 900 }), "Physics Engine"),
     physicsWorld(16, 9),
+    debugText(font),
     frameCount(0),
-    physicsTime(0.0f),
-    debugText(font)
+    physicsTime(0.0f)
 {
     // Load font from file
     if (!font.openFromFile("assets/fonts/poppins.regular.ttf")) {
@@ -25,23 +25,23 @@ Application::Application()
 
 Application::~Application() {
     // Clean up allocated memory for rigidbodies
-    for (Rigidbody* body : bodies) {
+    for (const Rigidbody* body : bodies) {
         delete body;
     }
     bodies.clear();
 }
 
 void Application::InitScene() {
-    int bodyCount = 50;
+    constexpr int bodyCount = 50;
 
     Gizmos::Init(&window, &font, PPU);
 
 	// Changes with window size
-    float worldWidth = 16.0f;
-    float worldHeight = 9.0f;
+    constexpr float worldWidth = 16.0f;
+    constexpr float worldHeight = 9.0f;
 
-    float wallThickness = 1.0f;
-    float halfThick = wallThickness / 2.0f;
+    constexpr float wallThickness = 1.0f;
+    constexpr float halfThick = wallThickness / 2.0f;
 
     // Floor 
     Rigidbody* floor = Rigidbody::CreateBox(worldWidth, wallThickness, 0.0f, 0.5f);
@@ -72,27 +72,27 @@ void Application::InitScene() {
     bodies.push_back(rightWall);
 
 
-    float shapeSize = 0.3f;
-    float spacing = 0.25f;
+    constexpr float shapeSize = 0.3f;
+    constexpr float spacing = 0.25f;
 
-    int columns = static_cast<int>(sqrt(bodyCount * 1.77f));
+    const int columns = static_cast<int>(sqrt(bodyCount * 1.77f));
 
-    float totalGroupWidth = columns * spacing;
-    float rows = std::ceil((float)bodyCount / columns);
-    float totalGroupHeight = rows * spacing;
+    const float totalGroupWidth = columns * spacing;
+    const float rows = std::ceil(static_cast<float>(bodyCount) / columns);
+    const float totalGroupHeight = rows * spacing;
 
-    float startX = (worldWidth - totalGroupWidth) / 2.0f;
-    float startY = (worldHeight - totalGroupHeight) / 2.0f;
+    const float startX = (worldWidth - totalGroupWidth) / 2.0f;
+    const float startY = (worldHeight - totalGroupHeight) / 2.0f;
 
     for (int i = 0; i < bodyCount; i++) {
-        int col = i % columns;
-        int row = i / columns;
+        const int col = i % columns;
+        const int row = i / columns;
 
-        float jitter = (static_cast<float>(rand()) / RAND_MAX) * 0.02f;
-        float xPos = startX + (col * spacing) + jitter;
-        float yPos = startY + (row * spacing);
+        const float jitter = (static_cast<float>(rand()) / RAND_MAX) * 0.02f;
+        const float xPos = startX + (col * spacing) + jitter;
+        const float yPos = startY + (row * spacing);
 
-        float randomRestitution = 0.2f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 0.7f));
+        const float randomRestitution = 0.2f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 0.7f));
 
         Rigidbody* body = nullptr;
         
@@ -105,11 +105,11 @@ void Application::InitScene() {
             // Create triangle finds the center and fixes the positional issues of the vertices
             // After that we'll move the bodies to their appropriate positions.
 
-            float s = shapeSize;
-            
-            sf::Vector2f p1(0.0f, -s / 2);
-            sf::Vector2f p2(s, s);
-            sf::Vector2f p3(-s, s);
+            constexpr float s = shapeSize;
+
+            constexpr sf::Vector2f p1(0.0f, -s / 2);
+            constexpr sf::Vector2f p2(s, s);
+            constexpr sf::Vector2f p3(-s, s);
 
             body = Rigidbody::CreateTriangle(p1, p2, p3, 1.0f, randomRestitution);
         }
@@ -119,8 +119,8 @@ void Application::InitScene() {
             body->position = sf::Vector2f(xPos, yPos);
 
             // Random velocity
-            float randVelX = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
-            float randVelY = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
+            const float randVelX = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
+            const float randVelY = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
             body->velocity = sf::Vector2f(randVelX, randVelY);
 
             body->color = sf::Color(66, 15, 47);
@@ -169,19 +169,19 @@ void Application::ProcessEvents() {
             window.close();
     }
 
-    bool spaceDown = sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Space);
+    const bool spaceDown = sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Space);
     if (spaceDown && !prevSpaceDown) {
         paused = !paused;
     }
     prevSpaceDown = spaceDown;
 
-    bool rightDown = sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Right);
+    const bool rightDown = sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Right);
     if (rightDown && !prevRightDown) {
         stepForward = true;
     }
     prevRightDown = rightDown;
 
-    bool leftDown = sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Left);
+    const bool leftDown = sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Left);
     if (leftDown && !prevLeftDown) {
         stepBackward = true;
     }
@@ -269,11 +269,10 @@ void Application::Render() {
     window.display();
 }
 
-void Application::LoadState(int index)
-{
+void Application::LoadState(int index) const {
     if (index < 0 || index >= history.size()) return;
 
-    auto& s = history[index];
+    const auto& s = history[index];
     for (int i = 0; i < bodies.size(); i++) {
         bodies[i]->position = s.positions[i];
         bodies[i]->velocity = s.velocities[i];
@@ -288,14 +287,14 @@ void Application::SaveState()
     s.velocities.reserve(bodies.size());
     s.angularVelocities.reserve(bodies.size());
 
-    for (auto* b : bodies) {
+    for (const auto* b : bodies) {
         s.positions.push_back(b->position);
         s.velocities.push_back(b->velocity);
         s.angularVelocities.push_back(b->angularVelocity);
     }
 
-    // geçmiþte ileri gitmiþsek ve tekrar oynuyorsak
-    if (historyIndex < (int)history.size() - 1) {
+    // Step back
+    if (historyIndex < static_cast<int>(history.size()) - 1) {
         history.erase(history.begin() + historyIndex + 1, history.end());
     }
 

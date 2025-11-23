@@ -1,10 +1,10 @@
 #include "Rigidbody.h"
 #include <cmath>
 
-Rigidbody::Rigidbody(ShapeType type, float mass, float friction, float damping, float restitution)
-	: shapeType(type), mass(mass), friction(friction), damping(damping), restitution(restitution),
-	velocity({ 0,0 }), position({ 0,0 }), rotation(0.0f), radius(0.0f),
-	inertia(0.0f), invInertia(0.0f), angularVelocity(0.0f), angularDamping(2.0f)
+Rigidbody::Rigidbody(const ShapeType shapeType, const float mass, const float friction, const float damping, const float restitution)
+	: shapeType(shapeType), velocity({ 0,0 }), angularVelocity(0.0f), mass(mass), friction(friction),
+	damping(damping), angularDamping(2.0f), restitution(restitution), radius(0.0f),
+	inertia(0.0f), invInertia(0.0f), position({ 0,0 }), rotation(0.0f)
 {
 	if (mass > 0.0f) {
 		invMass = 1.0f / mass;
@@ -14,8 +14,8 @@ Rigidbody::Rigidbody(ShapeType type, float mass, float friction, float damping, 
 	}
 }
 
-Rigidbody* Rigidbody::CreateCircle(float radius, float mass, float restitution) {
-	Rigidbody* body = new Rigidbody(ShapeType::Circle, mass, 0.5f, 0.8f, restitution);
+Rigidbody* Rigidbody::CreateCircle(const float radius, const float mass, const float restitution) {
+	auto body = new Rigidbody(ShapeType::Circle, mass, 0.5f, 0.8f, restitution);
 	body->radius = radius;
 
 	if (mass > 0.0f) {
@@ -30,10 +30,10 @@ Rigidbody* Rigidbody::CreateCircle(float radius, float mass, float restitution) 
 	return body;
 }
 
-Rigidbody* Rigidbody::CreateBox(float width, float height, float mass, float restitution) {
+Rigidbody* Rigidbody::CreateBox(const float width, const float height, const float mass, const float restitution) {
 	float halfW = width / 2.0f;
 	float halfH = height / 2.0f;
-	Rigidbody* body = new Rigidbody(ShapeType::Polygon, mass, 0.5f, 0.8f, restitution);
+	auto body = new Rigidbody(ShapeType::Polygon, mass, 0.5f, 0.8f, restitution);
 
 	// Changed the order of vertices to calculate the normals.
 	// because y is inverted in SFML. (-y, x) used to give the inward direction.
@@ -54,8 +54,8 @@ Rigidbody* Rigidbody::CreateBox(float width, float height, float mass, float res
 	return body;
 }
 
-Rigidbody* Rigidbody::CreateTriangle(sf::Vector2f p1, sf::Vector2f p2, sf::Vector2f p3, float mass, float restitution) {
-	Rigidbody* body = new Rigidbody(ShapeType::Polygon, mass, 0.5f, 0.8f, restitution);
+Rigidbody* Rigidbody::CreateTriangle(const sf::Vector2f p1, const sf::Vector2f p2, const sf::Vector2f p3, const float mass, const float restitution) {
+	auto body = new Rigidbody(ShapeType::Polygon, mass, 0.5f, 0.8f, restitution);
 	sf::Vector2f center = (p1 + p2 + p3) / 3.0f;
 
 	body->position = center;
@@ -81,7 +81,7 @@ Rigidbody* Rigidbody::CreateTriangle(sf::Vector2f p1, sf::Vector2f p2, sf::Vecto
 	return body;
 }
 
-std::vector<sf::Vector2f> Rigidbody::GetTransformedVertices() {
+std::vector<sf::Vector2f> Rigidbody::GetTransformedVertices() const {
 	// Circle has no vertices
 	if (shapeType == ShapeType::Circle) {
 		return {};
@@ -111,45 +111,45 @@ std::vector<sf::Vector2f> Rigidbody::GetTransformedVertices() {
 	return transformedVertices;
 }
 
-void Rigidbody::Step(float deltaTime) {
+void Rigidbody::Step(const float deltaTime) {
 	StepPosition(deltaTime);
 	StepRotation(deltaTime);
 	ApplyDamping(deltaTime);
 	ApplyAngularDamping(deltaTime);
 }
 
-void Rigidbody::ApplyForce(float force, sf::Vector2f direction) {
+void Rigidbody::ApplyForce(const float force, const sf::Vector2f direction) {
 	sf::Vector2f acc = (force * invMass) * direction;
 	this->velocity += acc;
 }
 
-void Rigidbody::ApplyDamping(float deltaTime) {
+void Rigidbody::ApplyDamping(const float deltaTime) {
 	this->velocity *= 1.0f / (1.0f + this->damping * deltaTime);
 }
 
-void Rigidbody::ApplyAngularDamping(float deltaTime)
+void Rigidbody::ApplyAngularDamping(const float deltaTime)
 {
 	this->angularVelocity *= 1.0f / (1.0f + this->angularDamping * deltaTime);
 }
 
-void Rigidbody::ApplyGravity(sf::Vector2f gravity, float deltaTime) {
+void Rigidbody::ApplyGravity(const sf::Vector2f gravity, const float deltaTime) {
 	// Static bodies
 	if (invMass == 0) return;
 	this->velocity += gravity * deltaTime;
 }
 
-void Rigidbody::StepPosition(float deltaTime) {
+void Rigidbody::StepPosition(const float deltaTime) {
 	this->position += this->velocity * deltaTime;
 }
 
-void Rigidbody::StepRotation(float deltaTime)
+void Rigidbody::StepRotation(const float deltaTime)
 {
 	this->rotation += this->angularVelocity * deltaTime;
 	while (this->rotation > 3.14f) this->rotation -= 2.0f * 3.14f;
 	while (this->rotation < -3.14f) this->rotation += 2.0f * 3.14f;
 }
 
-void Rigidbody::OnDrawGizmos() {
+void Rigidbody::OnDrawGizmos() const {
 	std::vector<sf::Vector2f> currentVertices = GetTransformedVertices();
 
 	for (int i = 0; i < currentVertices.size(); i++)
@@ -159,7 +159,7 @@ void Rigidbody::OnDrawGizmos() {
 
 		sf::Vector2f centerOfEdge = (p1 + p2) / 2.0f;
 		sf::Vector2f edge = p2 - p1;
-		sf::Vector2f normal = sf::Vector2f(-edge.y, edge.x);
+		auto normal = sf::Vector2f(-edge.y, edge.x);
 
 		normal = MathUtils::Normalize(normal);
 

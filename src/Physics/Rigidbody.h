@@ -17,7 +17,7 @@ public:
 	static Rigidbody* CreateBox(float width, float height, float mass, float restitution);
 	static Rigidbody* CreateTriangle(sf::Vector2f p1, sf::Vector2f p2, sf::Vector2f p3, float mass, float restitution);
 
-	void OnDrawGizmos();
+	void OnDrawGizmos() const;
 
 	// Physics
 	ShapeType shapeType;
@@ -48,7 +48,7 @@ public:
 	void StepPosition(float deltaTime);
 	void StepRotation(float deltaTime);
 
-	std::vector<sf::Vector2f> GetTransformedVertices();
+	std::vector<sf::Vector2f> GetTransformedVertices() const;
 
 private:
 	Rigidbody(ShapeType shapeType, float mass, float friction, float damping, float restitution);	

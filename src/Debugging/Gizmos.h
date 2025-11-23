@@ -158,7 +158,7 @@ private:
 
     // === INTERNAL RENDERING ===
 
-    void RenderLines() {
+    void RenderLines() const {
         for (const auto& line : lines) {
             sf::Vector2f start = line.start * PPU;
             sf::Vector2f end = line.end * PPU;
@@ -190,7 +190,7 @@ private:
         }
     }
 
-    void RenderCircles() {
+    void RenderCircles() const {
         for (const auto& circle : circles) {
             float radiusPx = circle.radius * PPU;
             sf::CircleShape shape(radiusPx);
@@ -210,7 +210,7 @@ private:
         }
     }
 
-    void RenderRects() {
+    void RenderRects() const {
         for (const auto& rect : rects) {
             sf::RectangleShape shape(rect.size * PPU);
             shape.setPosition(rect.position * PPU);
@@ -229,7 +229,7 @@ private:
         }
     }
 
-    void RenderTexts() {
+    void RenderTexts() const {
         if (!font) return;
 
         for (const auto& textData : texts) {
