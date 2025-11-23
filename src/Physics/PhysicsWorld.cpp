@@ -5,11 +5,7 @@
 #include "./Utils/MathUtils.h"
 #include <iostream>
 
-// Temporary floor positions based on window size
-const float FLOOR_Y = 9.0f;
-const float FLOOR_X_MAX = 16.0f;
-const float FLOOR_X_MIN = 0.0f;
-const int solverIterations = 16;
+const int solverIterations = 8;
 
 void PhysicsWorld::Step(float deltaTime) {
 	// Reset the grid
@@ -17,7 +13,6 @@ void PhysicsWorld::Step(float deltaTime) {
 	for (Rigidbody* body : bodies) {
 		body->Step(deltaTime);
 		body->ApplyGravity(gravity, deltaTime);
-		body->StepPosition(deltaTime);
 
 		// Fill the grid with bodies
 		grid.AddBody(body);
@@ -30,7 +25,7 @@ void PhysicsWorld::Step(float deltaTime) {
 }
 
 void PhysicsWorld::ResolveCollisions() {
-	for(Rigidbody* bodyA : bodies)
+	for (Rigidbody* bodyA : bodies)
 	{
 		// Another collision check for the walls
 		for (Rigidbody* wall : staticBodies) {
@@ -56,7 +51,7 @@ void PhysicsWorld::ResolveCollisions() {
 					// Duplicate check, if A-B is resolved skip B-A
 					if (bodyA > bodyB) continue;
 
-					
+
 					if (bodyA->shapeType == ShapeType::Circle && bodyB->shapeType == ShapeType::Circle) {
 						CheckForCircleCircleCollision(bodyA, bodyB);
 					}
@@ -101,23 +96,27 @@ void PhysicsWorld::CheckForCollision(Rigidbody& bodyA, Rigidbody& bodyB) {
 	std::vector<sf::Vector2f> axesB = GetAxes(verticesB);
 
 	// Combine the axes in a vector
-	std::vector<sf::Vector2f> axes;
-	for (auto& a : axesA) {
-		axes.push_back(a);
+	std::vector<AxisInfo> axes;
+
+	for (int i = 0; i < axesA.size(); i++) {
+		sf::Vector2f normal = axesA[i];
+		axes.push_back({ normal, &bodyA, i });
 	}
 
-	for (auto& a : axesB) {
-		axes.push_back(a);
+	for (int i = 0; i < axesB.size(); i++) {
+		sf::Vector2f normal = axesB[i];
+		axes.push_back({ normal, &bodyB, i });
 	}
 
-	float mtv = 999.0f;
-	sf::Vector2f mtvAxis;
+	AxisInfo bestAxis;
+	float mtv = std::numeric_limits<float>::max();
 	bool colliding = false;
 
 	// Project all the vertices onto the axes. 
 	// Get the min and max values for both shapes.
 	// If we find an axis where they do NOT overlap, they're not colliding.
-	for (auto axis : axes) {
+	for (auto const axis : axes) {
+
 		float minA = std::numeric_limits<float>::max();
 		float maxA = std::numeric_limits<float>::lowest();
 
@@ -128,7 +127,7 @@ void PhysicsWorld::CheckForCollision(Rigidbody& bodyA, Rigidbody& bodyB) {
 		{
 			sf::Vector2f vert = verticesA[i];
 
-			float dotProduct = MathUtils::Dot(vert, axis);
+			float dotProduct = MathUtils::Dot(vert, axis.normal);
 			if (dotProduct <= minA) {
 				minA = dotProduct;
 			}
@@ -142,7 +141,7 @@ void PhysicsWorld::CheckForCollision(Rigidbody& bodyA, Rigidbody& bodyB) {
 		{
 			sf::Vector2f vert = verticesB[i];
 
-			float dotProduct = MathUtils::Dot(vert, axis);
+			float dotProduct = MathUtils::Dot(vert, axis.normal);
 			if (dotProduct <= minB) {
 				minB = dotProduct;
 			}
@@ -165,24 +164,125 @@ void PhysicsWorld::CheckForCollision(Rigidbody& bodyA, Rigidbody& bodyB) {
 		// then we subtract the maxMin from minMax 
 		float minMax = std::min(maxA, maxB);
 		float maxMin = std::max(minA, minB);
-		
+
 		float tempMtv = minMax - maxMin;
 
-		if (tempMtv < mtv) 
+		if (tempMtv < mtv)
 		{
 			mtv = tempMtv;
-			mtvAxis = axis;
+			bestAxis = axis;
+		}
+	}
+	if (!colliding) return;
+
+
+	// Bodies
+	Rigidbody* refBody = bestAxis.referenceBody;
+	Rigidbody* incBody = (bestAxis.referenceBody == &bodyA) ? &bodyB : &bodyA;
+
+	const auto& refVertices = refBody == &bodyA ? verticesA : verticesB;
+
+	// find the collision normal (in which direction the inc body should move after collision)
+	sf::Vector2f refToInc = incBody->position - refBody->position;
+
+	// fix the collision normals direction. We need this correction because if two edges are parallel
+	// like in a square, we might've selected the wrong edge.
+	if (MathUtils::Dot(bestAxis.normal, refToInc) < 0) {
+		bestAxis.normal = -bestAxis.normal;
+	}
+
+	int bestEdgeIndex = -1;
+	float maxDot = std::numeric_limits<float>::lowest();
+
+	// find the ref face here.
+	for (int i = 0; i < refVertices.size(); i++)
+	{
+		sf::Vector2f p1 = refVertices[i];
+		sf::Vector2f p2 = refVertices[(i + 1) % refVertices.size()];
+
+		sf::Vector2f edge = p2 - p1;
+		sf::Vector2f edgeNormal = sf::Vector2f(-edge.y, edge.x);
+
+		float tempDot = MathUtils::Dot(edgeNormal, bestAxis.normal);
+
+		if (tempDot > maxDot) {
+			maxDot = tempDot;
+			bestAxis.edgeIndex = i;
+		}
+	}
+	
+	// Grab the normals and vertices of the incident body
+	// Normals are for comparison, vertices are for clipping
+	std::vector<sf::Vector2f> incNormals = incBody == &bodyA ? axesA : axesB;
+	const std::vector<sf::Vector2f>& incVertices = incBody == &bodyA ? verticesA : verticesB;
+
+	int incFaceIndex = -1;
+	float minDot = std::numeric_limits<float>::max();
+
+	// Find the face that is most anti-parallel to the reference face normal
+	// This is the face that is colliding
+	for (int i = 0; i < incNormals.size(); i++)
+	{
+		float dot = MathUtils::Dot(bestAxis.normal, incNormals[i]);
+		if (dot < minDot) {
+			minDot = dot;
+			incFaceIndex = i;
 		}
 	}
 
-	sf::Vector2f collisionNormal = bodyB.position - bodyA.position;
+	// Get the incident face vertices to be clipped
+	std::vector<sf::Vector2f> pointsOnIncFace{ incVertices[incFaceIndex] , incVertices[(incFaceIndex + 1) % incVertices.size()] };
 
-	float mtvDirDot = MathUtils::Dot(mtvAxis, collisionNormal);
-	if (mtvDirDot < 0) mtvAxis = sf::Vector2f(-mtvAxis.x, -mtvAxis.y);
+	sf::Vector2f p1 = pointsOnIncFace[0];
+	sf::Vector2f p2 = pointsOnIncFace[1];
 
-	if (colliding) {
-		ResolveCollision(bodyA, bodyB, mtv, mtvAxis);
+	for (int i = 0; i < pointsOnIncFace.size(); i++)
+	{
+		sf::Vector2f p1 = pointsOnIncFace[i];
+		sf::Vector2f p2 = pointsOnIncFace[(i + 1) % pointsOnIncFace.size()];
 	}
+	// Get the reference face vertices which act as the clipping boundaries
+	int refIndex = bestAxis.edgeIndex;
+	sf::Vector2f refV1 = refVertices[refIndex];
+	sf::Vector2f refV2 = refVertices[(refIndex + 1) % refVertices.size()];
+
+	// Find the edge direction
+	sf::Vector2f edgeDir = refV2 - refV1;
+	edgeDir = MathUtils::Normalize(edgeDir);
+
+	// Do the clip
+	std::vector<sf::Vector2f> clippedPoints = Clip(pointsOnIncFace, edgeDir, MathUtils::Dot(edgeDir, refV1));
+	if (clippedPoints.size() < 2) return;
+	clippedPoints = Clip(clippedPoints, -edgeDir, MathUtils::Dot(-edgeDir, refV2));
+
+	// Find the exact point to compare the points against for the depth check 
+	// Are the points inside the ref body?
+	float refOffset = MathUtils::Dot(bestAxis.normal, refV1);
+
+	// Craete the collision manifold.
+	CollisionManifold manifold = CollisionManifold();
+
+	// Check every point against the face with dot product.
+	for (sf::Vector2f p : clippedPoints) {
+		float depth = MathUtils::Dot(bestAxis.normal, p) - refOffset;
+
+		if (depth <= 0.0f) {
+			manifold.contactPoints.push_back(p);
+		}
+	}
+
+	if (manifold.contactPoints.empty()) {
+		return;
+	}
+
+
+	manifold.refBody = refBody;
+	manifold.incBody = incBody;
+	manifold.depth = mtv;
+	manifold.collisionAxis = bestAxis.normal;
+
+	// Resolve the collision using the calculated MTV and axis
+	ResolveCollision(manifold);
 }
 
 // Basic circle-circle collision detection
@@ -206,44 +306,99 @@ void PhysicsWorld::CheckForCircleCircleCollision(Rigidbody* bodyA, Rigidbody* bo
 
 		// sf::Vector2f collisionNormalNormalized = collisionNormal / distance;
 
-		ResolveCollision(*bodyA, *bodyB, penetrationDepth, collisionNormal);
+		// ResolveCollision(*bodyA, *bodyB, penetrationDepth, collisionNormal);
 	}
 }
 
-void PhysicsWorld::ResolveCollision(Rigidbody& bodyA, Rigidbody& bodyB, float mtv, sf::Vector2f collisionNormal) {
+void PhysicsWorld::ResolveCollision(CollisionManifold& manifold) {
 
-	sf::Vector2f collisionNormalNormalized = MathUtils::Normalize(collisionNormal);
+	sf::Vector2f normal = MathUtils::Normalize(manifold.collisionAxis);
+	Rigidbody& refBody = *manifold.refBody;
+	Rigidbody& incBody = *manifold.incBody;
+	float depth = manifold.depth;
+
+	// Baumgarte stabilization
+	// Don't try to apply all the positional correction in one step.
+	const float percent = 0.2f;
+	const float slop = 0.01f;
 
 	// Positional correction based on mass
-	float totalInvMass = bodyA.invMass + bodyB.invMass;
+	float totalInvMass = refBody.invMass + incBody.invMass;
 	if (totalInvMass > 0.0f)
 	{
-		sf::Vector2f movePerIMass = collisionNormalNormalized * (mtv / totalInvMass);
-		bodyA.position -= movePerIMass * bodyA.invMass;
-		bodyB.position += movePerIMass * bodyB.invMass;
+		float correctionDepth = std::max(depth - slop, 0.0f);
+		sf::Vector2f correction = normal * (correctionDepth / totalInvMass) * percent;
+		refBody.position -= correction * refBody.invMass;
+		incBody.position += correction * incBody.invMass;
 	}
 
+	// If we don't have contact points, we can't calculate rotation.
+	// We only did positional correction above to prevent sinking.
+	if (manifold.contactPoints.empty()) return;
+
+	// Calculate the contact point.
+	// we average all contact points for stability.
+	sf::Vector2f contactPoint = sf::Vector2f(0, 0);
+	for (const auto& p : manifold.contactPoints) {
+		contactPoint += p;
+		Gizmos::DrawPoint(p);
+	}
+	contactPoint /= (float)manifold.contactPoints.size();
+
+	// Calculate the moment arm
+	sf::Vector2f rA = contactPoint - refBody.position;
+	sf::Vector2f rB = contactPoint - incBody.position;
+
+	// Calculate Relative Velocity
+	// V_rel = V_b - V_a
+	// But we must include the rotational velocity at that specific point:
+	// V_point = V_linear + (AngularVelocity * Radius_Perpendicular)
+	sf::Vector2f velA = refBody.velocity + MathUtils::Cross(refBody.angularVelocity, rA);
+	sf::Vector2f velB = incBody.velocity + MathUtils::Cross(incBody.angularVelocity, rB);
+
 	// Find the relvative velocity
-	sf::Vector2f relativeVelocity = bodyB.velocity - bodyA.velocity;
+	sf::Vector2f relativeVelocity = velB - velA;
 
 	// Find the velocity along the normal of the collision, using dot product.
-	float velocityAlongNormal = MathUtils::Dot(relativeVelocity, collisionNormalNormalized);
+	float velocityAlongNormal = MathUtils::Dot(relativeVelocity, normal);
+
+	// Early Exit: If bodies are already separating, don't apply impulse.
+	if (velocityAlongNormal > 0) return;
 
 	// Get the minimum restitution of the two bodies
-	float e = std::min(bodyA.restitution, bodyB.restitution);
+	float e = std::min(refBody.restitution, incBody.restitution);
 
-	// Calculate impulse scalar
-	float j = (-(1.0f + e) * velocityAlongNormal) / (bodyA.invMass + bodyB.invMass);
+	// Calculate the Impulse Scalar (j)
+	// Denominator terms:
+	// 1. Linear Mass (invMass)
+	// 2. Rotational Inertia ((r x n)^2 * invInertia) -> This adds resistance to rotation.
 
-	// Calculate the impulse
-	sf::Vector2f impulse = j * collisionNormalNormalized;
+	float raCrossN = MathUtils::Cross(rA, normal);
+	float rbCrossN = MathUtils::Cross(rB, normal);
 
+	float invMassSum = refBody.invMass + incBody.invMass +
+		(raCrossN * raCrossN) * refBody.invInertia +
+		(rbCrossN * rbCrossN) * incBody.invInertia;
 
-	bodyA.velocity -= impulse * bodyA.invMass;
-	bodyB.velocity += impulse * bodyB.invMass;
+	// Apply the impulse formula: j = -(1 + e) * V_rel / TotalMassAndInertia
+	float j = (-(1.0f + e) * velocityAlongNormal) / invMassSum;
+
+	// Calculate the final Impulse Vector
+	sf::Vector2f impulse = j * normal;
+
+	float torqueA = MathUtils::Cross(rA, impulse);
+	float torqueB = MathUtils::Cross(rB, impulse);
+
+	// Apply linear impulse
+	refBody.velocity -= impulse * refBody.invMass;
+	incBody.velocity += impulse * incBody.invMass;
+
+	// Apply angular impulse 
+	refBody.angularVelocity -= MathUtils::Cross(rA, impulse) * refBody.invInertia;
+	incBody.angularVelocity += MathUtils::Cross(rB, impulse) * incBody.invInertia;
 }
 
-std::vector<sf::Vector2f> PhysicsWorld::GetAxes(const std::vector<sf::Vector2f> &vertices) {
+std::vector<sf::Vector2f> PhysicsWorld::GetAxes(const std::vector<sf::Vector2f>& vertices) {
 	std::vector<sf::Vector2f> axes;
 
 	// Find the axis by getting the vertices.
@@ -266,4 +421,54 @@ std::vector<sf::Vector2f> PhysicsWorld::GetAxes(const std::vector<sf::Vector2f> 
 	}
 
 	return axes;
+}
+
+// Clip the line (used to get the contact points.) No depth check here. 
+std::vector<sf::Vector2f> PhysicsWorld::Clip(const std::vector<sf::Vector2f>& incFace, const sf::Vector2f& normal, float offset) {
+
+
+	std::vector<sf::Vector2f> contactPoints;
+
+	// we need at 2 points for it to considered as a face.
+	if (incFace.size() < 2) return contactPoints;
+
+	// Get the points
+	sf::Vector2f v1 = incFace[0];
+	sf::Vector2f v2 = incFace[1];
+
+	//std::cout << "--- Clip Debug ---" << std::endl;
+	//std::cout << "Normal: " << normal.x << ", " << normal.y << " | Offset: " << offset << std::endl;
+	//std::cout << "V1 Pos: (" << v1.x << ", " << v1.y << ")" << std::endl;
+	//std::cout << "V2 Pos: (" << v2.x << ", " << v2.y << ")" << std::endl;
+
+	// get the dot product of the normal and points to see and then add the offset to see if the point is inside.
+	float d1 = MathUtils::Dot(normal, v1) - offset;
+	float d2 = MathUtils::Dot(normal, v2) - offset;
+	//std::cout << "d1 is: " << d1 << std::endl;
+	//std::cout << "d2 is: " << d2 << std::endl;
+
+	// if dot value is bigger than 0 the point is inside the tunnel we created.
+	if (d1 > 0.0f) {
+		contactPoints.push_back(v1);
+	}
+
+	if (d2 > 0.0f) {
+		contactPoints.push_back(v2);
+	}
+
+	// check if any of the point is left outside
+	if (d1 * d2 < 0.0f) {
+		// we'll find out how much outside the point is.
+		// Think of this like d1 is +5 and d2 is -5 (meaning d1 is inside 5 meter and d2 is outside by 5 meters).
+		// t is lerping factor. so 5 / 10 = 0.5 that means we need to slide that point by half of the distance of the face
+		float t = d1 / (d1 - d2);
+
+		// get the intersection by lerping that much on the v1
+		sf::Vector2f intersectionPoint = v1 + (v2 - v1) * t;
+
+		contactPoints.push_back(intersectionPoint);
+	}
+
+	return contactPoints;
+
 }

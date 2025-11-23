@@ -8,6 +8,14 @@ public:
         return (a.x * b.x) + (a.y * b.y);
     }
 
+    static inline float Cross(const sf::Vector2f& a, const sf::Vector2f& b) {
+        return (a.x * b.y) - (a.y * b.x);
+    }
+
+    static inline sf::Vector2f Cross(float s, const sf::Vector2f& a) {
+        return sf::Vector2f(-s * a.y, s * a.x);
+    }
+
     static inline sf::Vector2f Normalize(const sf::Vector2f &vector) {
         // Vector / magnitude
         // magnitude = sqrt (x^2 + y^2)

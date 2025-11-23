@@ -3,7 +3,26 @@
 #include <vector>
 #include "Rigidbody.h"
 #include "./Collision/BroadPhase/Grid.h"
+#include "./Debugging/Gizmos.h"
 
+
+struct AxisInfo {
+	sf::Vector2f normal; // normalized SAT axis
+	Rigidbody* referenceBody; // this axis came from polygon A or B
+	int edgeIndex; // which edge generated this axis
+};
+
+struct CollisionManifold {
+	// Bodies involved
+	Rigidbody* refBody;
+	Rigidbody* incBody;
+
+	// Contact info
+	std::vector<sf::Vector2f> contactPoints;
+	sf::Vector2f collisionAxis;
+	float depth;
+
+};
 
 class PhysicsWorld {
 public:
@@ -16,20 +35,18 @@ public:
 	void Step(float deltaTime);
 	void AddBody(Rigidbody* body);
 	void RemoveBody(Rigidbody* body);
-
-
 private:
 	std::vector<Rigidbody*> bodies;
 	std::vector<Rigidbody*> staticBodies;
 	sf::Vector2f gravity;
 	void ResolveCollisions();
-	void BoundaryCheck(float deltaTime);
 	void CheckForCollision(Rigidbody& bodyA, Rigidbody& bodyB);
 	void CheckForCircleCircleCollision(Rigidbody* bodyA, Rigidbody* bodyB);
-	void ResolveCollision(Rigidbody& bodyA, Rigidbody& bodyB, float mtv, sf::Vector2f collisionNormal);
+	void ResolveCollision(CollisionManifold &manifold);
 	std::vector<sf::Vector2f> GetAxes(const std::vector<sf::Vector2f>& vertices);
 
-	Grid grid;
+	std::vector<sf::Vector2f> Clip(const std::vector<sf::Vector2f>& incFace, const sf::Vector2f& normal, float offset);
 
+	Grid grid;
 
 };

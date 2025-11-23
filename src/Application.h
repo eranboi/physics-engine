@@ -3,6 +3,7 @@
 #include <vector>
 #include "Physics/PhysicsWorld.h"
 #include "Physics/Rigidbody.h"
+#include "./Debugging/Gizmos.h"
 
 
 struct SimulationState {

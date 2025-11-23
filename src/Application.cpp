@@ -34,6 +34,8 @@ Application::~Application() {
 void Application::InitScene() {
     int bodyCount = 50;
 
+    Gizmos::Init(&window, &font, PPU);
+
 	// Changes with window size
     float worldWidth = 16.0f;
     float worldHeight = 9.0f;
@@ -71,7 +73,7 @@ void Application::InitScene() {
 
 
     float shapeSize = 0.3f;
-    float spacing = 1.f;
+    float spacing = 0.25f;
 
     int columns = static_cast<int>(sqrt(bodyCount * 1.77f));
 
@@ -121,7 +123,7 @@ void Application::InitScene() {
             float randVelY = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
             body->velocity = sf::Vector2f(randVelX, randVelY);
 
-            body->color = sf::Color(224, 187, 228);
+            body->color = sf::Color(66, 15, 47);
           
             // Add to the simulation
             physicsWorld.AddBody(body);
@@ -188,14 +190,16 @@ void Application::ProcessEvents() {
 
 void Application::Update(float dt) {
     if (paused) {
-        // Bir step ileri
+        // Step forward
         if (stepForward) {
+            Gizmos::Clear();
             physicsWorld.Step(dt);
             SaveState();
             stepForward = false;
         }
-        // Bir step geri
+        // Step back
         else if (stepBackward) {
+            Gizmos::Clear();
             if (historyIndex > 0) {
                 historyIndex--;
                 LoadState(historyIndex);
@@ -203,18 +207,19 @@ void Application::Update(float dt) {
             stepBackward = false;
         }
 
-        // Pause modundayken normal akýþý çalýþtýrma
+        // If paused return
         return;
     }
+    Gizmos::Clear();
     physicsWorld.Step(dt);
     SaveState();
 }
 
 void Application::Render() {
     window.clear();
-
     // Render all bodies using the shared shape (Idk if that's helping with the performance or not)
     for (Rigidbody* body : bodies) {
+        body->OnDrawGizmos();
         if(body-> shapeType == ShapeType::Circle)
         {
             ballShape.setRadius(body->radius * PPU);
@@ -236,6 +241,8 @@ void Application::Render() {
             window.draw(polygonShape);
         }
     }
+    
+    // Gizmos::Render();
 
     // Calculate and display FPS and Physics stats
     frameCount++;
