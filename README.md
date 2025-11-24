@@ -20,7 +20,7 @@ A rigid body physics simulation built with C++ and SFML.
 ## Building
 
 Requires:
-- C++20 compiler
+- C++17 compiler
 - SFML 3.0+
 - CMake (or your build system of choice)
 
@@ -113,6 +113,7 @@ Grid-based broad phase reduces collision checks from O(n²) to roughly O(n). Adj
 - No CCD (continuous collision detection) - fast objects can tunnel
 - Solver can be unstable with very high mass ratios
 - Stacking is not perfectly stable
+- Jitter :(
 
 ## License
 
