@@ -2,8 +2,10 @@
 #include <SFML/Graphics.hpp>
 #include <vector>
 #include "Physics/PhysicsWorld.h"
-#include "Physics/Rigidbody.h"
+#include "Physics/Core/Rigidbody.h"
 #include "./Debugging/Gizmos.h"
+#include "Physics/Dynamics/Solvers/ImpulseSolver.h"
+
 
 
 struct SimulationState {

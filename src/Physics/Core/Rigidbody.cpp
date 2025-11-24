@@ -70,7 +70,7 @@ Rigidbody* Rigidbody::CreateTriangle(const sf::Vector2f p1, const sf::Vector2f p
 		float height = std::abs(p3.y - p1.y);
 
 		// Calculate the inertia
-		body->inertia = (1.0f / 12.0f) * mass * (width * width + height * height);
+		body->inertia = (mass / 18.0f) * (width * width + height * height);
 		body->invInertia = 1.0f / body->inertia;
 	}
 	else {

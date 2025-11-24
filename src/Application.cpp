@@ -2,9 +2,10 @@
 #include <iostream>
 #include <sstream>
 
+
 Application::Application()
     : window(sf::VideoMode({ 1600, 900 }), "Physics Engine"),
-    physicsWorld(16, 9),
+    physicsWorld(16, 9, new ImpulseSolver()),
     debugText(font),
     frameCount(0),
     physicsTime(0.0f)
@@ -32,7 +33,7 @@ Application::~Application() {
 }
 
 void Application::InitScene() {
-    constexpr int bodyCount = 50;
+    constexpr int bodyCount = 10;
 
     Gizmos::Init(&window, &font, PPU);
 
@@ -72,8 +73,8 @@ void Application::InitScene() {
     bodies.push_back(rightWall);
 
 
-    constexpr float shapeSize = 0.3f;
-    constexpr float spacing = 0.25f;
+    constexpr float shapeSize = 0.25f;
+    constexpr float spacing = 0.75f;
 
     const int columns = static_cast<int>(sqrt(bodyCount * 1.77f));
 
@@ -95,12 +96,12 @@ void Application::InitScene() {
         const float randomRestitution = 0.2f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 0.7f));
 
         Rigidbody* body = nullptr;
-        
+        int randShape = rand() % 3;
         // Random object creation
-        if (rand() % 2 == 0) {
+        if (randShape == 0) {
             body = Rigidbody::CreateBox(shapeSize, shapeSize, 1.0f, randomRestitution);
         }
-        else {
+        else if (randShape == 1) {
             // Get local points for the triangle
             // Create triangle finds the center and fixes the positional issues of the vertices
             // After that we'll move the bodies to their appropriate positions.
@@ -112,6 +113,10 @@ void Application::InitScene() {
             constexpr sf::Vector2f p3(-s, s);
 
             body = Rigidbody::CreateTriangle(p1, p2, p3, 1.0f, randomRestitution);
+        }else if (randShape == 2) {
+            constexpr float s = shapeSize;
+
+            body = Rigidbody::CreateCircle(s, 1.0f, randomRestitution);
         }
 
         // Move to body to the position and give it initial values.
@@ -242,7 +247,7 @@ void Application::Render() {
         }
     }
     
-    // Gizmos::Render();
+    Gizmos::Render();
 
     // Calculate and display FPS and Physics stats
     frameCount++;
@@ -252,6 +257,7 @@ void Application::Render() {
         ss << "Debug Info\n"
             << "FPS:           " << frameCount << "\n"
             << "Entities:      " << bodies.size() << "\n"
+            << "Manifolds:     " << physicsWorld.GetManifoldCount() << "\n"
             << "Physics Time:  " << physicsTime << " s\n"
             << "Game State:    " << (paused ? "Paused" : "Running") << "\n"
             << "History Size:  " << history.size() << "\n"

@@ -1,6 +1,6 @@
 #pragma once
 #include <vector>
-#include "../../Rigidbody.h"
+#include "../../Core/Rigidbody.h"
 
 class Grid {
 public:

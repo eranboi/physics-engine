@@ -25,11 +25,11 @@ FetchContent_MakeAvailable(sfml)
 
 # --- Source Files ---
 # Find all .cpp files inside 'src' and its subdirectories recursively
-file(GLOB_RECURSE SOURCES "src/*.cpp")
-
+file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*/*.cpp" "src/*/*/*.cpp" "src/*/*/*/*.cpp")
 # --- Create Executable ---
 # CRITICAL: Only use ${SOURCES}. Do NOT list files manually here if GLOB_RECURSE is used.
-add_executable(${PROJECT_NAME} ${SOURCES})
+add_executable(${PROJECT_NAME} ${SOURCES}
+        "src/Physics/Collision/Narrow Phase/CollisionManifold.h")
 
 # --- Include Directories ---
 target_include_directories(${PROJECT_NAME} PRIVATE src)
