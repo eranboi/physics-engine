@@ -25,8 +25,8 @@ void ImpulseSolver::ApplyPositionalCorrection(const CollisionManifold &manifold)
 	const float totalInvMass = refBody->invMass + incBody->invMass;
 	if (totalInvMass > 0.0f) {
 		constexpr float slop = 0.01f;
-		constexpr float percent = 0.2f;
-		constexpr float maxCorrection = 0.2f;
+		constexpr float percent = 0.8f;
+		constexpr float maxCorrection = 0.5f;
 
 		float correctionDepth = std::max(depth - slop, 0.0f);
 		correctionDepth = std::min(correctionDepth, maxCorrection); // LIMIT
@@ -51,7 +51,7 @@ void ImpulseSolver::ResolveVelocity(const CollisionManifold &manifold) {
 	auto contactPoint = sf::Vector2f(0, 0);
 	for (const auto& p : manifold.contactPoints) {
 		contactPoint += p;
-		Gizmos::DrawCross(p, 0.05f, sf::Color::Yellow);
+		// Gizmos::DrawCross(p, 0.05f, sf::Color::Yellow);
 	}
 	contactPoint /= static_cast<float>(manifold.contactPoints.size());
 
@@ -106,5 +106,61 @@ void ImpulseSolver::ResolveVelocity(const CollisionManifold &manifold) {
 	// Apply angular impulse
 	refBody->angularVelocity -= torqueA * refBody->invInertia;
 	incBody->angularVelocity += torqueB * incBody->invInertia;
-}
 
+	// Firction
+
+	// Calculate the tangent
+	sf::Vector2f tangent = relativeVelocity - (normal * velocityAlongNormal);
+
+	// Check if there's any tangential velocity
+	const float tangentLength = std::sqrt(tangent.x * tangent.x + tangent.y * tangent.y);
+	if (tangentLength < 0.0001f) {
+		// No sliding motion, no friction needed
+		return;
+	}
+
+	// Normalize tangent
+	tangent = tangent / tangentLength;
+
+	// Velocity along the tangent = sliding velocity
+	const float velocityAlongTangent = MathUtils::Dot(relativeVelocity, tangent);
+
+	// Calculate effective mass in tangent direction
+	const float raCrossT = MathUtils::Cross(rA, tangent);
+	const float rbCrossT = MathUtils::Cross(rB, tangent);
+
+	const float invMassSumTangent = refBody->invMass + incBody->invMass +
+		(raCrossT * raCrossT) * refBody->invInertia +
+		(rbCrossT * rbCrossT) * incBody->invInertia;
+
+	// Combined friction coefficient
+	const float friction = std::sqrt(refBody->friction * incBody->friction);
+
+	// Calculate friction impulse magnitude
+	// Coulomb friction: |f| <= μ * |N|
+	// We want to stop sliding, so ideal impulse would be: jt = -velocityAlongTangent / invMassSumTangent
+	// But it's clamped by Coulomb's law
+	float jt = -velocityAlongTangent / invMassSumTangent;
+
+	// Clamp friction impulse by Coulomb's law
+	const float maxFriction = std::abs(friction * j);
+	if (std::abs(jt) > maxFriction) {
+		// Kinetic friction (sliding)
+		jt = maxFriction * (jt < 0 ? -1.0f : 1.0f);
+	}
+	// else: Static friction (no sliding, friction cancels tangential velocity)
+
+	// Apply friction impulse
+	const sf::Vector2f frictionImpulse = tangent * jt;
+
+	const float frictionTorqueA = MathUtils::Cross(rA, frictionImpulse);
+	const float frictionTorqueB = MathUtils::Cross(rB, frictionImpulse);
+
+	// Apply linear friction impulse
+	refBody->velocity -= frictionImpulse * refBody->invMass;
+	incBody->velocity += frictionImpulse * incBody->invMass;
+
+	// Apply angular friction impulse -> Rolling
+	refBody->angularVelocity -= frictionTorqueA * refBody->invInertia;
+	incBody->angularVelocity += frictionTorqueB * incBody->invInertia;
+}
