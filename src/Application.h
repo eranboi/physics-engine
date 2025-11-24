@@ -25,7 +25,13 @@ private:
     void ProcessEvents();
     void Update(float dt);
     void Render();
+
+    // Scene setup functions
     void InitScene();
+    void CreateStaticWalls(float worldWidth, float worldHeight, float wallThickness);
+    void CreatePlatforms(float worldWidth, float worldHeight);
+    void CreateDynamicBodies(float worldWidth, float worldHeight);
+
     void LoadState(int index) const;
     void SaveState();
 
@@ -56,4 +62,3 @@ private:
     int frameCount;
     float physicsTime;
 };
-

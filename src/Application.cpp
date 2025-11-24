@@ -32,109 +32,279 @@ Application::~Application() {
     bodies.clear();
 }
 
-void Application::InitScene() {
-    constexpr int bodyCount = 10;
+void Application::CreateStaticWalls(float worldWidth, float worldHeight, float wallThickness) {
+    float halfThick = wallThickness / 2.0f;
 
-    Gizmos::Init(&window, &font, PPU);
+    // Config for static walls (mass = 0 means infinite mass, thus static)
+    RigidbodyConfig wallConfig;
+    wallConfig.mass = 0.0f;
+    wallConfig.restitution = 0.3f;
+    wallConfig.friction = 0.6f;
 
-	// Changes with window size
-    constexpr float worldWidth = 16.0f;
-    constexpr float worldHeight = 9.0f;
+    constexpr sf::Color wallColor(40, 40, 40);
 
-    constexpr float wallThickness = 1.0f;
-    constexpr float halfThick = wallThickness / 2.0f;
-
-    // Floor 
-    Rigidbody* floor = Rigidbody::CreateBox(worldWidth, wallThickness, 0.0f, 0.5f);
+    // Floor
+    Rigidbody* floor = Rigidbody::CreateBox(worldWidth, wallThickness, wallConfig);
     floor->position = sf::Vector2f(worldWidth / 2.0f, worldHeight - halfThick);
-    floor->color = sf::Color(50, 50, 50);
+    floor->color = wallColor;
     physicsWorld.AddBody(floor);
     bodies.push_back(floor);
 
     // Ceiling
-    Rigidbody* ceiling = Rigidbody::CreateBox(worldWidth, wallThickness, 0.0f, 0.5f);
+    Rigidbody* ceiling = Rigidbody::CreateBox(worldWidth, wallThickness, wallConfig);
     ceiling->position = sf::Vector2f(worldWidth / 2.0f, halfThick);
-    ceiling->color = sf::Color(50, 50, 50);
+    ceiling->color = wallColor;
     physicsWorld.AddBody(ceiling);
     bodies.push_back(ceiling);
 
     // Left Wall
-    Rigidbody* leftWall = Rigidbody::CreateBox(wallThickness, worldHeight - (wallThickness * 2), 0.0f, 0.5f);
+    Rigidbody* leftWall = Rigidbody::CreateBox(wallThickness, worldHeight - (wallThickness * 2), wallConfig);
     leftWall->position = sf::Vector2f(halfThick, worldHeight / 2.0f);
-    leftWall->color = sf::Color(50, 50, 50);
+    leftWall->color = wallColor;
     physicsWorld.AddBody(leftWall);
     bodies.push_back(leftWall);
 
     // Right Wall
-    Rigidbody* rightWall = Rigidbody::CreateBox(wallThickness, worldHeight - (wallThickness * 2), 0.0f, 0.5f);
+    Rigidbody* rightWall = Rigidbody::CreateBox(wallThickness, worldHeight - (wallThickness * 2), wallConfig);
     rightWall->position = sf::Vector2f(worldWidth - halfThick, worldHeight / 2.0f);
-    rightWall->color = sf::Color(50, 50, 50);
+    rightWall->color = wallColor;
     physicsWorld.AddBody(rightWall);
     bodies.push_back(rightWall);
+}
 
+void Application::CreatePlatforms(float worldWidth, float worldHeight) {
+    constexpr sf::Color platformColor(80, 80, 90);
+    constexpr sf::Color slopeColor(90, 70, 70);
 
-    constexpr float shapeSize = 0.25f;
-    constexpr float spacing = 0.75f;
+    // Platform configurations
+    RigidbodyConfig lowFrictionConfig;
+    lowFrictionConfig.mass = 0.0f;
+    lowFrictionConfig.restitution = 0.2f;
+    lowFrictionConfig.friction = 0.1f;
 
-    const int columns = static_cast<int>(sqrt(bodyCount * 1.77f));
+    RigidbodyConfig normalFrictionConfig;
+    normalFrictionConfig.mass = 0.0f;
+    normalFrictionConfig.restitution = 0.3f;
+    normalFrictionConfig.friction = 0.6f;
 
-    const float totalGroupWidth = columns * spacing;
-    const float rows = std::ceil(static_cast<float>(bodyCount) / columns);
-    const float totalGroupHeight = rows * spacing;
+    RigidbodyConfig highFrictionConfig;
+    highFrictionConfig.mass = 0.0f;
+    highFrictionConfig.restitution = 0.2f;
+    highFrictionConfig.friction = 1.2f;
 
-    const float startX = (worldWidth - totalGroupWidth) / 2.0f;
-    const float startY = (worldHeight - totalGroupHeight) / 2.0f;
+    // Left side - Slippery slope
+    {
+        std::vector<sf::Vector2f> slopeVertices;
+        constexpr float slopeWidth = 3.0f;
+        constexpr float slopeHeight = 1.5f;
 
-    for (int i = 0; i < bodyCount; i++) {
-        const int col = i % columns;
-        const int row = i / columns;
+        // Create a slope
+        slopeVertices.push_back(sf::Vector2f(-slopeWidth / 2.0f, slopeHeight / 2.0f));  // Bottom left
+        slopeVertices.push_back(sf::Vector2f(slopeWidth / 2.0f, slopeHeight / 2.0f));   // Bottom right
+        slopeVertices.push_back(sf::Vector2f(slopeWidth / 2.0f, -slopeHeight / 2.0f));  // Top right
 
-        const float jitter = (static_cast<float>(rand()) / RAND_MAX) * 0.02f;
-        const float xPos = startX + (col * spacing) + jitter;
-        const float yPos = startY + (row * spacing);
+        Rigidbody* slope = Rigidbody::CreatePolygon(slopeVertices, lowFrictionConfig);
+        slope->position = sf::Vector2f(3.5f, worldHeight - 3.0f);
+        slope->color = sf::Color(100, 150, 200);
+        physicsWorld.AddBody(slope);
+        bodies.push_back(slope);
+    }
 
-        const float randomRestitution = 0.2f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 0.7f));
+    // Center - Normal platform
+    {
+        Rigidbody* platform = Rigidbody::CreateBox(4.0f, 0.3f, normalFrictionConfig);
+        platform->position = sf::Vector2f(worldWidth / 2.0f, worldHeight - 4.5f);
+        platform->color = platformColor;
+        physicsWorld.AddBody(platform);
+        bodies.push_back(platform);
+    }
 
-        Rigidbody* body = nullptr;
-        int randShape = rand() % 3;
-        // Random object creation
-        if (randShape == 0) {
-            body = Rigidbody::CreateBox(shapeSize, shapeSize, 1.0f, randomRestitution);
-        }
-        else if (randShape == 1) {
-            // Get local points for the triangle
-            // Create triangle finds the center and fixes the positional issues of the vertices
-            // After that we'll move the bodies to their appropriate positions.
+    // Right side - Sticky slope
+    {
+        std::vector<sf::Vector2f> slopeVertices;
+        constexpr float slopeWidth = 3.0f;
+        constexpr float slopeHeight = 1.5f;
 
-            constexpr float s = shapeSize;
+        slopeVertices.push_back(sf::Vector2f(-slopeWidth / 2.0f, -slopeHeight / 2.0f));  // Top left
+        slopeVertices.push_back(sf::Vector2f(-slopeWidth / 2.0f, slopeHeight / 2.0f));   // Bottom left
+        slopeVertices.push_back(sf::Vector2f(slopeWidth / 2.0f, slopeHeight / 2.0f));    // Bottom right
 
-            constexpr sf::Vector2f p1(0.0f, -s / 2);
-            constexpr sf::Vector2f p2(s, s);
-            constexpr sf::Vector2f p3(-s, s);
+        Rigidbody* slope = Rigidbody::CreatePolygon(slopeVertices, highFrictionConfig);
+        slope->position = sf::Vector2f(worldWidth - 3.5f, worldHeight - 3.0f);
+        slope->color = sf::Color(200, 100, 100);
+        physicsWorld.AddBody(slope);
+        bodies.push_back(slope);
+    }
 
-            body = Rigidbody::CreateTriangle(p1, p2, p3, 1.0f, randomRestitution);
-        }else if (randShape == 2) {
-            constexpr float s = shapeSize;
+    // Small platform steps
+    {
+        // Low friction step
+        Rigidbody* step1 = Rigidbody::CreateBox(1.5f, 0.2f, lowFrictionConfig);
+        step1->position = sf::Vector2f(3.0f, worldHeight - 2.0f);
+        step1->color = sf::Color(100, 150, 200);
+        physicsWorld.AddBody(step1);
+        bodies.push_back(step1);
 
-            body = Rigidbody::CreateCircle(s, 1.0f, randomRestitution);
-        }
+        // High friction step
+        Rigidbody* step2 = Rigidbody::CreateBox(1.5f, 0.2f, highFrictionConfig);
+        step2->position = sf::Vector2f(worldWidth - 3.0f, worldHeight - 2.0f);
+        step2->color = sf::Color(200, 100, 100);
+        physicsWorld.AddBody(step2);
+        bodies.push_back(step2);
+    }
 
-        // Move to body to the position and give it initial values.
-        if (body != nullptr) {
-            body->position = sf::Vector2f(xPos, yPos);
+    // Rotated platform
+    {
+        Rigidbody* rotatedPlatform = Rigidbody::CreateBox(2.5f, 0.25f, normalFrictionConfig);
+        rotatedPlatform->position = sf::Vector2f(worldWidth / 2.0f, worldHeight - 6.5f);
+        rotatedPlatform->rotation = 0.3f;
+        rotatedPlatform->color = platformColor;
+        physicsWorld.AddBody(rotatedPlatform);
+        bodies.push_back(rotatedPlatform);
+    }
+}
 
-            // Random velocity
-            const float randVelX = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
-            const float randVelY = -4.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 8.0f));
-            body->velocity = sf::Vector2f(randVelX, randVelY);
+void Application::CreateDynamicBodies(float worldWidth, float worldHeight) {
+    // Shape colors
+    constexpr sf::Color boxColor(255, 107, 107);
+    constexpr sf::Color triangleColor(78, 205, 196);
+    constexpr sf::Color circleColor(255, 195, 0);
+    constexpr sf::Color hexagonColor(199, 125, 255);
+    constexpr sf::Color pentagonColor(255, 159, 243);
 
-            body->color = sf::Color(66, 15, 47);
-          
-            // Add to the simulation
-            physicsWorld.AddBody(body);
-            bodies.push_back(body);
+    // Configuration for dynamic bodies
+    RigidbodyConfig dynamicConfig;
+    dynamicConfig.mass = 10000000.f;
+    dynamicConfig.friction = 0.4f;
+    dynamicConfig.damping = 0.1f;
+    dynamicConfig.angularDamping = .5f;
+
+    // Grid parameters for initial placement
+    constexpr float spacing = .75f;
+    constexpr int columns = 16;
+    constexpr int rows = 46;
+
+    const float startX = (worldWidth - (columns * spacing)) / 2.0f + spacing / 2.0f;
+    constexpr float startY = 2.0f;
+
+    int shapeIndex = 0;
+
+    for (int row = 0; row < rows; row++) {
+        for (int col = 0; col < columns; col++) {
+            const float xPos = startX + (col * spacing);
+            const float yPos = startY + (row * spacing);
+
+            // Add small random jitter to positions
+            const float jitterX = ((static_cast<float>(rand()) / RAND_MAX) - 0.5f) * 0.1f;
+            const float jitterY = ((static_cast<float>(rand()) / RAND_MAX) - 0.5f) * 0.1f;
+
+            // Random restitution
+            dynamicConfig.restitution = 0.3f + static_cast<float>(rand()) / (RAND_MAX / 0.5f);
+
+            Rigidbody* body = nullptr;
+
+            // Cycle through different shapes
+            int shapeType = shapeIndex % 5;
+
+            switch (shapeType) {
+                case 0: { // Box
+                    constexpr float size = 0.35f;
+                    body = Rigidbody::CreateBox(size, size, dynamicConfig);
+                    body->color = boxColor;
+                    break;
+                }
+
+                case 1: { // Triangle
+                    constexpr float size = 0.4f;
+                    constexpr sf::Vector2f p1(0.0f, -size * 0.7f);
+                    constexpr sf::Vector2f p2(size * 0.8f, size * 0.5f);
+                    constexpr sf::Vector2f p3(-size * 0.8f, size * 0.5f);
+                    body = Rigidbody::CreateTriangle(p1, p2, p3, dynamicConfig);
+                    body->color = triangleColor;
+                    break;
+                }
+
+                case 2: { // Circle
+                    constexpr float radius = 0.2f;
+                    body = Rigidbody::CreateCircle(radius, dynamicConfig);
+                    body->color = circleColor;
+                    break;
+                }
+
+                case 3: { // Hexagon
+                    std::vector<sf::Vector2f> hexVertices;
+                    constexpr float radius = 0.25f;
+                    constexpr int sides = 6;
+                    constexpr float angleStep = 2.0f * 3.14159f / sides;
+
+                    for (int i = 0; i < sides; i++) {
+                        float angle = -i * angleStep;  // CCW in SFML
+                        hexVertices.push_back(sf::Vector2f(
+                            radius * std::cos(angle),
+                            radius * std::sin(angle)
+                        ));
+                    }
+
+                    body = Rigidbody::CreatePolygon(hexVertices, dynamicConfig);
+                    body->color = hexagonColor;
+                    break;
+                }
+
+                case 4: { // Pentagon
+                    std::vector<sf::Vector2f> pentVertices;
+                    constexpr float radius = 0.25f;
+                    constexpr int sides = 5;
+                    constexpr float angleStep = 2.0f * 3.14159f / sides;
+                    constexpr float angleOffset = -3.14159f / 2.0f; // Start from top
+
+                    for (int i = 0; i < sides; i++) {
+                        float angle = -i * angleStep + angleOffset;  // CCW in SFML
+                        pentVertices.push_back(sf::Vector2f(
+                            radius * std::cos(angle),
+                            radius * std::sin(angle)
+                        ));
+                    }
+
+                    body = Rigidbody::CreatePolygon(pentVertices, dynamicConfig);
+                    body->color = pentagonColor;
+                    break;
+                }
+            }
+
+            if (body != nullptr) {
+                body->position = sf::Vector2f(xPos + jitterX, yPos + jitterY);
+
+                // Add some random initial velocity for chaos
+                constexpr float velMagnitude = 2.0f;
+                const float randVelX = ((static_cast<float>(rand()) / RAND_MAX) - 0.5f) * velMagnitude;
+                const float randVelY = ((static_cast<float>(rand()) / RAND_MAX) - 0.5f) * velMagnitude;
+                body->velocity = sf::Vector2f(randVelX, randVelY);
+
+                // Random initial rotation
+                const float randAngVel = ((static_cast<float>(rand()) / RAND_MAX) - 0.5f) * 3.0f;
+                body->angularVelocity = randAngVel;
+
+                physicsWorld.AddBody(body);
+                bodies.push_back(body);
+            }
+
+            shapeIndex++;
         }
     }
+}
+
+void Application::InitScene() {
+    Gizmos::Init(&window, &font, PPU);
+
+    // World dimensions
+    constexpr float worldWidth = 16.0f;
+    constexpr float worldHeight = 9.0f;
+    constexpr float wallThickness = 1.0f;
+
+    // Create scene in stages
+    CreateStaticWalls(worldWidth, worldHeight, wallThickness);
+    CreatePlatforms(worldWidth, worldHeight);
+    CreateDynamicBodies(worldWidth, worldHeight);
 }
 
 void Application::Run() {
@@ -246,7 +416,7 @@ void Application::Render() {
             window.draw(polygonShape);
         }
     }
-    
+
     Gizmos::Render();
 
     // Calculate and display FPS and Physics stats
@@ -307,4 +477,3 @@ void Application::SaveState()
     history.push_back(s);
     historyIndex = history.size() - 1;
 }
-
