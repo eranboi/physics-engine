@@ -1,10 +1,11 @@
 #include "Rigidbody.h"
 #include <cmath>
 
-Rigidbody::Rigidbody(const ShapeType shapeType, const float mass, const float friction, const float damping, const float restitution)
-	: shapeType(shapeType), velocity({ 0,0 }), angularVelocity(0.0f), mass(mass), friction(friction),
-	damping(damping), angularDamping(2.0f), restitution(restitution), radius(0.0f),
-	inertia(0.0f), invInertia(0.0f), position({ 0,0 }), rotation(0.0f)
+Rigidbody::Rigidbody(const ShapeType shapeType, const RigidbodyConfig& config)
+	: shapeType(shapeType), velocity({ 0,0 }), angularVelocity(0.0f),
+	  mass(config.mass), friction(config.friction), damping(config.damping),
+	  angularDamping(config.angularDamping), restitution(config.restitution),
+	  radius(0.0f), inertia(0.0f), invInertia(0.0f), position({ 0,0 }), rotation(0.0f)
 {
 	if (mass > 0.0f) {
 		invMass = 1.0f / mass;
@@ -14,12 +15,13 @@ Rigidbody::Rigidbody(const ShapeType shapeType, const float mass, const float fr
 	}
 }
 
-Rigidbody* Rigidbody::CreateCircle(const float radius, const float mass, const float restitution) {
-	auto body = new Rigidbody(ShapeType::Circle, mass, 0.5f, 0.8f, restitution);
+Rigidbody* Rigidbody::CreateCircle(const float radius, const RigidbodyConfig& config) {
+	auto body = new Rigidbody(ShapeType::Circle, config);
 	body->radius = radius;
 
-	if (mass > 0.0f) {
-		body->inertia = 0.5f * mass * radius * radius;
+	if (config.mass > 0.0f) {
+		// Inertia for a solid circle: I = (1/2) * m * r^2
+		body->inertia = 0.5f * config.mass * radius * radius;
 		body->invInertia = 1.0f / body->inertia;
 	}
 	else {
@@ -30,10 +32,10 @@ Rigidbody* Rigidbody::CreateCircle(const float radius, const float mass, const f
 	return body;
 }
 
-Rigidbody* Rigidbody::CreateBox(const float width, const float height, const float mass, const float restitution) {
+Rigidbody* Rigidbody::CreateBox(const float width, const float height, const RigidbodyConfig& config) {
 	float halfW = width / 2.0f;
 	float halfH = height / 2.0f;
-	auto body = new Rigidbody(ShapeType::Polygon, mass, 0.5f, 0.8f, restitution);
+	auto body = new Rigidbody(ShapeType::Polygon, config);
 
 	// Changed the order of vertices to calculate the normals.
 	// because y is inverted in SFML. (-y, x) used to give the inward direction.
@@ -42,8 +44,9 @@ Rigidbody* Rigidbody::CreateBox(const float width, const float height, const flo
 	body->vertices.push_back(sf::Vector2f(halfW, halfH));   // Bottom Right
 	body->vertices.push_back(sf::Vector2f(halfW, -halfH));  // Top Right
 
-	if (mass > 0.0f) {
-		body->inertia = (1.0f / 12.0f) * mass * (width * width + height * height);
+	if (config.mass > 0.0f) {
+		// Inertia for a rectangle: I = (1/12) * m * (w^2 + h^2)
+		body->inertia = (1.0f / 12.0f) * config.mass * (width * width + height * height);
 		body->invInertia = 1.0f / body->inertia;
 	}
 	else {
@@ -54,23 +57,21 @@ Rigidbody* Rigidbody::CreateBox(const float width, const float height, const flo
 	return body;
 }
 
-Rigidbody* Rigidbody::CreateTriangle(const sf::Vector2f p1, const sf::Vector2f p2, const sf::Vector2f p3, const float mass, const float restitution) {
-	auto body = new Rigidbody(ShapeType::Polygon, mass, 0.5f, 0.8f, restitution);
-	sf::Vector2f center = (p1 + p2 + p3) / 3.0f;
+Rigidbody* Rigidbody::CreateTriangle(const sf::Vector2f p1, const sf::Vector2f p2, const sf::Vector2f p3, const RigidbodyConfig& config) {
+	auto body = new Rigidbody(ShapeType::Polygon, config);
 
+	// Calculate centroid
+	sf::Vector2f center = (p1 + p2 + p3) / 3.0f;
 	body->position = center;
 
+	// Store vertices relative to centroid
 	body->vertices.push_back(p1 - center);
 	body->vertices.push_back(p3 - center);
 	body->vertices.push_back(p2 - center);
 
-	if (mass > 0.0f) {
-		// find an approx value for width and height for testing
-		float width = std::abs(p2.x - p1.x);
-		float height = std::abs(p3.y - p1.y);
-
-		// Calculate the inertia
-		body->inertia = (mass / 18.0f) * (width * width + height * height);
+	if (config.mass > 0.0f) {
+		// Use the generic polygon inertia calculation
+		body->inertia = CalculatePolygonInertia(body->vertices, config.mass);
 		body->invInertia = 1.0f / body->inertia;
 	}
 	else {
@@ -79,6 +80,73 @@ Rigidbody* Rigidbody::CreateTriangle(const sf::Vector2f p1, const sf::Vector2f p
 	}
 
 	return body;
+}
+
+Rigidbody* Rigidbody::CreatePolygon(const std::vector<sf::Vector2f>& vertices, const RigidbodyConfig& config) {
+	if (vertices.size() < 3) {
+		// Invalid polygon
+		return nullptr;
+	}
+
+	auto body = new Rigidbody(ShapeType::Polygon, config);
+
+	// Calculate centroid
+	sf::Vector2f centroid(0.0f, 0.0f);
+	for (const auto& v : vertices) {
+		centroid += v;
+	}
+	centroid /= static_cast<float>(vertices.size());
+	body->position = centroid;
+
+	// Store vertices relative to centroid
+	for (const auto& v : vertices) {
+		body->vertices.push_back(v - centroid);
+	}
+
+	if (config.mass > 0.0f) {
+		// Calculate inertia using the polygon method
+		body->inertia = CalculatePolygonInertia(body->vertices, config.mass);
+		body->invInertia = 1.0f / body->inertia;
+	}
+	else {
+		body->inertia = 0.0f;
+		body->invInertia = 0.0f;
+	}
+
+	return body;
+}
+
+float Rigidbody::CalculatePolygonInertia(const std::vector<sf::Vector2f>& vertices, float mass) {
+	// Using the formula for moment of inertia of a polygon about its centroid
+	// I = (mass / 6) * sum(|cross(v[i], v[i+1])| * (dot(v[i], v[i]) + dot(v[i], v[i+1]) + dot(v[i+1], v[i+1])))
+
+	float numerator = 0.0f;
+	float denominator = 0.0f;
+
+	for (size_t i = 0; i < vertices.size(); i++) {
+		const sf::Vector2f& v1 = vertices[i];
+		const sf::Vector2f& v2 = vertices[(i + 1) % vertices.size()];
+
+		float cross = std::abs(MathUtils::Cross(v1, v2));
+		float dot1 = MathUtils::Dot(v1, v1);
+		float dot2 = MathUtils::Dot(v1, v2);
+		float dot3 = MathUtils::Dot(v2, v2);
+
+		numerator += cross * (dot1 + dot2 + dot3);
+		denominator += cross;
+	}
+
+	if (denominator < 0.0001f) {
+		// Degenerate polygon, use approximation
+		float maxDist = 0.0f;
+		for (const auto& v : vertices) {
+			float dist = std::sqrt(MathUtils::Dot(v, v));
+			if (dist > maxDist) maxDist = dist;
+		}
+		return mass * maxDist * maxDist;
+	}
+
+	return (mass / 6.0f) * (numerator / denominator);
 }
 
 std::vector<sf::Vector2f> Rigidbody::GetTransformedVertices() const {
@@ -150,6 +218,8 @@ void Rigidbody::StepRotation(const float deltaTime)
 }
 
 void Rigidbody::OnDrawGizmos() const {
+	return;
+
 	std::vector<sf::Vector2f> currentVertices = GetTransformedVertices();
 
 	for (int i = 0; i < currentVertices.size(); i++)
@@ -164,8 +234,8 @@ void Rigidbody::OnDrawGizmos() const {
 		normal = MathUtils::Normalize(normal);
 
 		// Draw vertices
-		// Gizmos::DrawPoint(p1, sf::Color::Red, 0.02f);
-		// Gizmos::DrawText(p1, "p" + std::to_string(i));
+		// Gizmos::DrawPoint(p1, sf::Color::White, 0.02f);
+		// Gizmos::DrawText(p1, std::to_string(i));
 
 		// Draw edges
 		// Gizmos::DrawLine(p1, p2, sf::Color::Green);
@@ -174,6 +244,11 @@ void Rigidbody::OnDrawGizmos() const {
 		float normalLength = 0.25f;
 		sf::Vector2f arrowEnd = centerOfEdge + (normal * normalLength);
 
-		// Gizmos::DrawArrow(centerOfEdge, arrowEnd, sf::Color::Yellow, 0.02f, 0.1f);
+		/// Gizmos::DrawArrow(centerOfEdge, arrowEnd, sf::Color::White, 0.02f, 0.1f);
 	}
+
+	// Log the friction value
+	char frictionText[16];
+	snprintf(frictionText, sizeof(frictionText), "%.1f", friction);
+	Gizmos::DrawText(this->position, frictionText);
 }
