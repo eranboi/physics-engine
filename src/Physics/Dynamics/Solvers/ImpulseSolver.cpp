@@ -3,7 +3,7 @@
 #include <iostream>
 
 void ImpulseSolver::Solve(std::vector<CollisionManifold> &manifolds, float dt) {
-	constexpr int solverIterations = 6;
+	constexpr int solverIterations = 8;
 
 	for (int i = 0; i < solverIterations; i++) {
 		for (auto& manifold : manifolds) {
